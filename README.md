@@ -6,7 +6,7 @@
 
 Robot arm building instructions, STL files, BOM, PAROL6 control board code and schematics can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
 
-PAROL6 comamnder software is tool for controling and programming PAROL6 robotic arm!
+PAROL6 commander software is tool for controlling and programming PAROL6 robotic arm!
 Some of the features are: <br />
 * Loop rates of up to 100Hz allowing for real time control
 * Joint jogging
@@ -52,7 +52,7 @@ pip3 install -e .
 
 # Documentation:
 
-How to use PAROL commander software can be found in [DOCS](https://pcrnjak.github.io/PAROL-docs/)
+Documentation on how to use the PAROL commander software can be found in [DOCS](https://pcrnjak.github.io/PAROL-docs/)
 
 
 # More about PAROL6
