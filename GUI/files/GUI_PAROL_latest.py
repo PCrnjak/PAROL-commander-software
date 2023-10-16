@@ -19,10 +19,12 @@ import random
 import multiprocessing
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
-from visual_kinematics.RobotSerial import *
+#from visual_kinematics.RobotSerial import *
 import numpy as np
 from math import pi
 import PAROL6_ROBOT 
+from datetime import datetime
+
 logging.basicConfig(level = logging.DEBUG,
     format='%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s',
     datefmt='%H:%M:%S'
@@ -45,13 +47,29 @@ text_size = 14
 
 # Globals
 current_menu = "Jog"
-Wrf_Trf = "WRF"
+Wrf_Trf = "TRF"
 Current_Custom_pose_select = "Current"
 Robot_sim = True
 Real_robot = True
 left_right_select = "Left"
+Quick_grip = 0
 Now_open_txt = ''
+prev_string_shared = ""
 
+# These are the values that are displayed in the gui and are updated every xx ms
+x_value = ""
+y_value = ""
+z_value = ""
+Rx_pos = ""
+Ry_pos = ""
+Rz_pos = ""
+
+Joint1_value = ""
+Joint2_value = ""
+Joint3_value = ""
+Joint4_value = ""
+Joint5_value = ""
+Joint6_value = ""
 
 #customtkinter.set_appearance_mode("Light")  # Modes: "System" (standard), "Dark", "Light"
 customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
@@ -68,7 +86,7 @@ prev_positions = np.array([0,0,0,0,0,0])
 robot_pose = [0,0,0,0,0,0] #np.array([0,0,0,0,0,0])
 
 padx_top_bot = 20
-def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out,
+def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out,
          Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
          XTR_data,Gripper_data_in,
         Joint_jog_buttons,Cart_jog_buttons,Jog_control,General_data,Buttons):
@@ -76,7 +94,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
 
     app = customtkinter.CTk()
-
+    shared_string.value = b'PAROL6 commander v1.0'
     #logging.debug(left_jog_buttons)
     #logging.debug(Joint_jog_buttons)
     logging.debug("I RUN")
@@ -162,7 +180,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.Connect_button = customtkinter.CTkButton(app.bottom_select_frame,text="Connect", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
         app.Connect_button.grid(row=3, column=8, padx=padx_top_bot,pady = 10,sticky="e")
 
-        app.Clear_error = customtkinter.CTkButton(app.bottom_select_frame,text="Clear error", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.Clear_error = customtkinter.CTkButton(app.bottom_select_frame,text="Clear error", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Clear_error)
         app.Clear_error.grid(row=3, column=9, padx=padx_top_bot,pady = 10,sticky="e")
 
         #app.enable_disable = customtkinter.CTkButton(app.bottom_select_frame,text="Enable", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
@@ -171,7 +189,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         #app.home = customtkinter.CTkButton(app.bottom_select_frame,text="Home", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Home_robot)
         #app.home.grid(row=3, column=10, padx=padx_top_bot,pady = 10,sticky="e")
 
-        app.estop_status = customtkinter.CTkLabel(app.bottom_select_frame, text="Estop activated", font=customtkinter.CTkFont(size=15))
+        app.estop_status = customtkinter.CTkLabel(app.bottom_select_frame, text="", font=customtkinter.CTkFont(size=15))
         app.estop_status.grid(row=3, column=11, padx=(0,0), pady=10 ,sticky="ne")
 
 
@@ -308,12 +326,64 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.appearance_mode_optionemenu.grid(row=0, column=4, padx=(5, 0))
 
     def IO_frame():
-        app.demo2 = customtkinter.CTkButton(app.IO_frame,text="io", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
-        app.demo2.grid(row=0, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.Input1 = customtkinter.CTkLabel(app.IO_frame, text="INPUT 1: " + str(InOut_in[0]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.Input1.grid(row=0, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.Input2 = customtkinter.CTkLabel(app.IO_frame, text="INPUT 2: " + str(InOut_in[1]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.Input2.grid(row=1, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.ESTOP_STATUS = customtkinter.CTkLabel(app.IO_frame, text="ESTOP: " + str(InOut_in[4]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.ESTOP_STATUS.grid(row=2, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.OUTPUT_1_LABEL = customtkinter.CTkLabel(app.IO_frame, text="OUTPUT 1 is: " + str(InOut_out[2]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.OUTPUT_1_LABEL.grid(row=3, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.Set_1_low = customtkinter.CTkButton(app.IO_frame,text="LOW", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command= lambda: Set_output_1(0))
+        app.Set_1_low.grid(row=3, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.Set_1_high = customtkinter.CTkButton(app.IO_frame,text="HIGH", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command= lambda: Set_output_1(1))
+        app.Set_1_high.grid(row=3, column=2, padx=20,pady = (10,20),sticky="news")
+
+        app.OUTPUT_2_LABEL = customtkinter.CTkLabel(app.IO_frame, text="OUTPUT 2 is: " + str(InOut_out[3]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.OUTPUT_2_LABEL.grid(row=4, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.Set_2_low = customtkinter.CTkButton(app.IO_frame,text="LOW", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command= lambda: Set_output_2(0))
+        app.Set_2_low.grid(row=4, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.Set_2_high = customtkinter.CTkButton(app.IO_frame,text="HIGH", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command= lambda: Set_output_2(1))
+        app.Set_2_high.grid(row=4, column=2, padx=20,pady = (10,20),sticky="news")
+
 
     def Calibrate_frame():
-        app.demo2 = customtkinter.CTkButton(app.Calibrate_frame,text="calibrate", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.demo2 = customtkinter.CTkButton(app.Calibrate_frame,text="demo1 start", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_start)
         app.demo2.grid(row=0, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.demo3 = customtkinter.CTkButton(app.Calibrate_frame,text="demo1 stop", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
+        app.demo3.grid(row=1, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.disable_motor = customtkinter.CTkButton(app.Calibrate_frame,text="Disable motor", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
+        app.disable_motor.grid(row=2, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.enable_motor = customtkinter.CTkButton(app.Calibrate_frame,text="Enable motor", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
+        app.enable_motor.grid(row=2, column=2, padx=20,pady = (10,20),sticky="news")
+
+        app.Go_2_limit = customtkinter.CTkButton(app.Calibrate_frame,text="Go to limit", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
+        app.Go_2_limit.grid(row=2, column=3, padx=20,pady = (10,20),sticky="news")
+
+        app.joint_select = customtkinter.CTkOptionMenu(app.Calibrate_frame, values=["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5","Joint 6"],
+                                                            command=change_scaling_event)
+        app.joint_select.grid(row=2, column=4,padx=(5, 0) )
+
+
+    def demo_start():
+        Buttons[6] = 1
+        None
+
+    def demo_stop():
+        Buttons[6] = 0
+        None
+
 
     def translation_press(event=None,var=0, var2 = 0):
         translation_buttons[var2] = var
@@ -368,10 +438,10 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.cart_jog = customtkinter.CTkButton(app.cart_frame,text="Cartesian jog", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = raise_frame_cart)
         app.cart_jog.grid(row=0, column=1, padx=20,pady = (10,20),sticky="news")
 
-        app.WRF_select.select()
+        app.TRF_select.select()
         #cart z up and down            
-        z_up =Image.open(os.path.join(Image_path, "cart_z.png"))
-        z_down = z_up.rotate(180)
+        z_up =Image.open(os.path.join(Image_path, "cart_z_up.png"))
+        z_down =Image.open(os.path.join(Image_path, "cart_z_down.png")) #z_up.rotate(180)
 
         app.z_up = customtkinter.CTkImage(z_up, size=(80, 80))
         app.z_up_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
@@ -392,7 +462,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
         #cart x up
         x_up =Image.open(os.path.join(Image_path, "cart_x_up.png"))
-        app.x_up = customtkinter.CTkImage(x_up, size=(80, 80))
+        app.x_up = customtkinter.CTkImage(x_up, size=(80, 50))
         app.x_up_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
                                                     image=app.x_up, anchor="CENTER",text = "",hover = 0) #hover = 0
@@ -411,8 +481,8 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.x_down_button.bind('<ButtonRelease-1>',make_lambda_release(0,1))
 
         #cart y left right
-        y_left =Image.open(os.path.join(Image_path, "cart_y.png"))
-        y_right = y_left.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)  
+        y_left =Image.open(os.path.join(Image_path, "cart_y_left.png"))
+        y_right =Image.open(os.path.join(Image_path, "cart_y_right.png")) # y_left.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT)  
 
         app.y_left = customtkinter.CTkImage(y_left, size=(90, 90))
         app.y_left_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
@@ -434,7 +504,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
 
         #cart rot x + x-
-        rot_x_pos =Image.open(os.path.join(Image_path, "arrow_x_rot.png"))
+        rot_x_pos =Image.open(os.path.join(Image_path, "RX_MINUS.png"))
         app.rot_x_pos = customtkinter.CTkImage(rot_x_pos, size=(90, 90))
         app.rot_x_pos_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -443,8 +513,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.rot_x_pos_button.bind('<ButtonPress-1>',make_lambda_press_rot(1,0))
         app.rot_x_pos_button.bind('<ButtonRelease-1>',make_lambda_release_rot(0,0))
 
-        rot_x_neg = rot_x_pos.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT) 
-        rot_x_neg = rot_x_neg.rotate(180)
+        rot_x_neg =Image.open(os.path.join(Image_path, "RX_PLUS.png"))
         app.rot_x_neg = customtkinter.CTkImage(rot_x_neg, size=(90, 90))
         app.rot_x_neg_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -455,7 +524,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
 
         #cart rot y + y-
-        rot_y_pos =Image.open(os.path.join(Image_path, "arrow_y_rot.png"))
+        rot_y_pos =Image.open(os.path.join(Image_path, "RY_PLUS.png"))
         app.rot_y_pos = customtkinter.CTkImage(rot_y_pos, size=(90, 90))
         app.rot_y_pos_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -465,7 +534,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.rot_y_pos_button.bind('<ButtonRelease-1>',make_lambda_release_rot(0,2))
 
 
-        rot_y_neg = rot_y_pos.transpose(PIL.Image.Transpose.FLIP_LEFT_RIGHT) 
+        rot_y_neg=Image.open(os.path.join(Image_path, "RY_MINUS.png"))
         app.rot_y_neg = customtkinter.CTkImage(rot_y_neg, size=(90, 90))
         app.rot_y_neg_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -476,8 +545,8 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
 
         #cart rot z + z -
-        rot_z_pos =Image.open(os.path.join(Image_path, "arrow_z_rot.png"))
-        rot_z_pos_rot = rot_z_pos.rotate(270)
+        rot_z_pos_rot =Image.open(os.path.join(Image_path, "RZ_MINUS.png"))
+        #rot_z_pos_rot = rot_z_pos.rotate(270)
         app.rot_z_pos = customtkinter.CTkImage(rot_z_pos_rot, size=(90, 90))
         app.rot_z_pos_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -486,7 +555,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.rot_z_pos_button.bind('<ButtonPress-1>',make_lambda_press_rot(1,5))
         app.rot_z_pos_button.bind('<ButtonRelease-1>',make_lambda_release_rot(0,5))
 
-        rot_z_neg = rot_z_pos_rot.transpose(PIL.Image.Transpose.FLIP_TOP_BOTTOM)
+        rot_z_neg =Image.open(os.path.join(Image_path, "RZ_PLUS.png"))
         app.rot_z_neg = customtkinter.CTkImage(rot_z_neg, size=(90, 90))
         app.rot_z_neg_button = customtkinter.CTkButton(app.cart_frame, corner_radius=0, height=10, border_spacing=10,
                                                     fg_color="transparent", text_color=("gray10", "gray90"),
@@ -561,6 +630,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.Velocity_label.grid(row=1, column=3,  padx=(50,20) ,pady = (5,5),sticky="news")
 
         app.slider1 = customtkinter.CTkSlider(app.joint_positions_frame,from_ = 0, to = 100,number_of_steps=100)
+        app.slider1.set(50)
         app.slider1.grid(row=1, column=4,columnspan=1, padx=(20, 10), pady=(5, 5), sticky="news")
 
         app.Velocity_percent = customtkinter.CTkLabel(app.joint_positions_frame,text="100%", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
@@ -570,6 +640,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.Accel_label.grid(row=2, column=3, padx=(50,20),pady = (5,5),sticky="news")
 
         app.slider2 = customtkinter.CTkSlider(app.joint_positions_frame,from_ = 0, to = 100,number_of_steps=100)
+        app.slider2.set(50)
         app.slider2.grid(row=2, column=4,columnspan=1, padx=(20, 10), pady=(5, 5), sticky="news")
 
         app.Accel_percent = customtkinter.CTkLabel(app.joint_positions_frame,text="100%", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
@@ -593,6 +664,9 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.enable_disable_2 = customtkinter.CTkButton(app.joint_positions_frame,text="Disable", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Disable_press)
         app.enable_disable_2.grid(row=6, column=3, padx=padx_top_bot,pady = 10,sticky="e")
 
+        app.Quick_gripper_on_off = customtkinter.CTkRadioButton(master=app.joint_positions_frame, text="Gripper On/Off",  command = quick_gripper_button )
+        app.Quick_gripper_on_off.grid(row=6, column=4, pady=10, padx=20, sticky="we")
+
         app.home = customtkinter.CTkButton(app.joint_positions_frame,text="Home", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Home_robot)
         app.home.grid(row=5, column=4, padx=padx_top_bot,pady = 10,sticky="e")
 
@@ -600,7 +674,8 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         
     def highlight_words_program(event):
         app.textbox_program.tag_config("green", foreground="green")
-        words = ["Delay", "JointMove", "CartLinVelSet","CartAccSet","Loop"]
+        words = PAROL6_ROBOT.Commands_list
+
         for word in words:
             start = "1.0"
             while True:
@@ -650,10 +725,10 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         #app.response_frame.grid_rowconfigure(1, weight=0)
         #app.response_frame.grid_rowconfigure(1, weight=1)
 
-        app.start = customtkinter.CTkButton(app.start_stop_frame,text="Start",width= 35, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.start = customtkinter.CTkButton(app.start_stop_frame,text="Start",width= 35, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = execute_program)
         app.start.grid(row=0, column=0, padx=2,pady = 5,sticky="w")
 
-        app.stop = customtkinter.CTkButton(app.start_stop_frame,text="Stop", width= 35,font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.stop = customtkinter.CTkButton(app.start_stop_frame,text="Stop", width= 35,font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = stop_program)
         app.stop.grid(row=0, column=1, padx=2,pady = 5,sticky="w")
 
         app.save = customtkinter.CTkButton(app.start_stop_frame,text="Save",width= 35, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = save_txt)
@@ -684,7 +759,6 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
 
         app.textbox_response = customtkinter.CTkTextbox(app.response_frame,font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
         app.textbox_response.grid(row=1, column=0,columnspan=2, padx=(20, 20), pady=(5, 20), sticky="nsew")
-
         app.textbox_response.bind("<KeyRelease>", highlight_words_response)
 
 
@@ -752,8 +826,8 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.table.heading('#1', text='Commands')
         
 
-        Commands_list = ["Home","Delay","End","Loop","JointVelSet","JointAccSet","JointMove","PoseMove","JoinTVelMove",
-                            "CartAccSet","CartLinVelSet","CartAngVelSet","CartMove","CartVelMoveTRF","CartVelMoveWRF"]
+        #Commands_list = ["Home","Delay","End","Loop","IO","JointVelSet","JointAccSet","JointMove","PoseMove","JointVelMove",
+                            #"CartAccSet","CartVelSet","CartLinVelSet","CartAngVelSet","CartMove","CartVelMoveTRF","CartVelMoveWRF"]
         # Commands
         Joint_space = app.table.insert(parent = '', index ='end',iid = 0,text="Parent",values="Joint_space")
         Cart_space = app.table.insert(parent = '', index ='end',iid = 1,text="Parent",values="Cartesian_space")
@@ -762,25 +836,23 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         Delay = app.table.insert(parent = '', index ='end',iid = 4,text="Parent",values="Delay")
         End = app.table.insert(parent = '', index ='end',iid = 5,text="Parent",values="End")
         Loop = app.table.insert(parent = '', index ='end',iid = 6,text="Parent",values="Loop")
-        IO_var = app.table.insert(parent = '', index ='end',iid = 7,text="Parent",values="IO")
-        Gripper = app.table.insert(parent = '', index ='end',iid = 8,text="Parent",values="Gripper")
-        Get_data = app.table.insert(parent = '', index ='end',iid = 9,text="Parent",values="Get_data")
-        Timeouts = app.table.insert(parent = '', index ='end',iid = 10,text="Parent",values="Timeouts")
+        Begin_ = app.table.insert(parent = '', index ='end',iid = 7,text="Parent",values="Begin")
+        Input_var_ = app.table.insert(parent = '', index ='end',iid = 8,text="Parent",values="Input")
+        Output_var_ = app.table.insert(parent = '', index ='end',iid = 9,text="Parent",values="Output")
+        Gripper = app.table.insert(parent = '', index ='end',iid = 10,text="Parent",values="Gripper")
+        Get_data = app.table.insert(parent = '', index ='end',iid = 11,text="Parent",values="Get_data")
+        Timeouts = app.table.insert(parent = '', index ='end',iid = 12,text="Parent",values="Timeouts")
 
         # Joint space commands
-        JointVelSet = app.table.insert(Joint_space, index ='end',iid = 100,open = True, text="Child",values="JointVelSet")
-        JointAccSet = app.table.insert(Joint_space, index ='end',iid = 101,open = True, text="Child",values="JointAccSet")
-        JointMove = app.table.insert(Joint_space, index ='end',iid = 102,open = True, text="Child",values="JointMove")
-        PoseMove = app.table.insert(Joint_space, index ='end',iid = 103,open = True, text="Child",values="PoseMove")
-        JoinTVelMove = app.table.insert(Joint_space, index ='end',iid = 104,open = True, text="Child",values="JointVelMove")
+        v1 = app.table.insert(Joint_space, index ='end',iid = 100,open = True, text="Child",values="MoveJoint")
+        v2 = app.table.insert(Joint_space, index ='end',iid = 101,open = True, text="Child",values="MovePose")
+        v3 = app.table.insert(Joint_space, index ='end',iid = 102,open = True, text="Child",values="SpeedJoint")
 
+    
         # Cart space commands
-        CartAccSet = app.table.insert(Cart_space, index ='end',iid = 110,open = True, text="Child",values="CartAccSet")
-        CartLinVelSet = app.table.insert(Cart_space, index ='end',iid = 120,open = True, text="Child",values="CartVelSet")
-        CartAngVelSet = app.table.insert(Cart_space, index ='end',iid = 130,open = True, text="Child",values="CartAngVelSet")
-        CartMove = app.table.insert(Cart_space, index ='end',iid = 140,open = True, text="Child",values="CartMove")
-        CartVelMoveTRF = app.table.insert(Cart_space, index ='end',iid = 150,open = True, text="Child",values="CartVelMoveTRF")
-        CartVelMoveWRF = app.table.insert(Cart_space, index ='end',iid = 160,open = True, text="Child",values="CartVelMoveWRF")
+        v1 = app.table.insert(Cart_space, index ='end',iid = 110,open = True, text="Child",values="MoveCart")
+        v2 = app.table.insert(Cart_space, index ='end',iid = 120,open = True, text="Child",values="MoveCartRelTRF")
+        v3 = app.table.insert(Cart_space, index ='end',iid = 130,open = True, text="Child",values="SpeedCart")
 
         # Gripper commands
 
@@ -791,15 +863,57 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
             logging.debug(selected)
             value = app.table.item(selected,'values')
             logging.debug(value[0])
+            if value[0] == "Cartesian_space" or value[0] == "Joint_space" or value[0] == "Conditional_stetements":
+                None
+                # Do nothing here because these are the selection menus
+            elif Current_Custom_pose_select == "Current":
+                if value[0] == "MoveJoint":
+                    app.textbox_program.insert(tk.INSERT, str(value[0]) + "(" + Joint1_value + "," + Joint2_value + "," +Joint3_value + "," +
+                                               Joint4_value +"," + Joint5_value +"," + Joint6_value + ")" +"\n")                    
+
+                elif value[0] == "MovePose":
+                    app.textbox_program.insert(tk.INSERT, str(value[0]) + "(" + x_value + "," + y_value + "," +z_value + "," +
+                                               Rx_pos +"," + Ry_pos +"," + Rz_pos + ")" +"\n")   
+
+                elif value[0] == "MoveCart":
+                    app.textbox_program.insert(tk.INSERT, str(value[0]) + "(" + x_value + "," + y_value + "," +z_value + "," +
+                                               Rx_pos +"," + Ry_pos +"," + Rz_pos + ")" +"\n")   
+                    
+                elif value[0] == "MoveCartRelTRF":
+                    app.textbox_program.insert(tk.INSERT, str(value[0]) + "(" + str(0) + "," + str(0) + "," +str(0) + "," +
+                                str(0) +"," + str(0) +"," + str(0) + ")" +"\n")   
+                else:
+                    app.textbox_program.insert(tk.INSERT, str(value[0]) + "()" +"\n")
+          
+            elif Current_Custom_pose_select == "Custom":
+                app.textbox_program.insert(tk.INSERT, str(value[0]) + "()" +"\n")
 
         app.table.bind('<ButtonRelease-1>', select)
 
 
+    def Set_output_1(state):
+        logging.debug("Output 1 state is: ")
+        logging.debug(state)
+        InOut_out[2] = state
+        InOut_in[2] = state
+
+    def Set_output_2(state):
+        logging.debug("Output 2 state is: ")
+        logging.debug(state)
+        InOut_out[3] = state
+        InOut_in[3] = state
+
     def Enable_press():
+        Buttons[1] = 1
         logging.debug("Enable press")
 
     def Disable_press():
+        Buttons[2] = 1
         logging.debug("Disable press")
+
+    def Clear_error():
+        Buttons[3] = 1
+        logging.debug("Clear error")
 
     def raise_frame_cart():
         app.cart_frame.tkraise() 
@@ -853,6 +967,39 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         app.textbox_program.insert(tk.END,temp_var)
         text_file.close()
 
+    def execute_program():
+        # When program start button is pressed:
+        # save the current file and save its content to execute_script.txt file
+        # set Button[7] flag to 1
+        logging.debug("Execute program")
+        global Now_open_txt
+        logging.debug(Now_open_txt)
+        # If program was blank or execute script
+        if Now_open_txt == '' or Now_open_txt == Image_path + "/Programs/execute_script.txt":
+            Now_open_txt = Image_path + "/Programs/execute_script.txt"
+            text_file = open(Now_open_txt,'w+')
+            text_file.write(app.textbox_program.get(1.0,tk.END))
+            text_file.close()
+        # If program was saved under some name.
+        # Save it again with that name and transfer content of the file to the execute script.
+        else:
+            text_file = open(Now_open_txt,'w+')
+            text_file.write(app.textbox_program.get(1.0,tk.END))
+            text_file.close()
+            x = Image_path + "/Programs/execute_script.txt"
+            text_file = open(x,'w+')
+            text_file.write(app.textbox_program.get(1.0,tk.END))
+            text_file.close()
+            
+        # Set flag to 1. Program will try to run
+        Buttons[7] = 1
+        
+
+    def stop_program():
+        logging.debug("Stop program")
+        Buttons[7] = 0
+
+
     def save_txt():
         logging.debug("Save txt")
         global Now_open_txt
@@ -886,7 +1033,7 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         else:
             app.radio_button_sim.select()
             Buttons[5] = 1
-        logging.debug(Robot_sim)
+        logging.debug(Robot_sim) 
 
     def Select_real_robot():
         global Real_robot
@@ -898,6 +1045,19 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
             app.radio_button_real.select()
             Buttons[4] = 1
         logging.debug(Real_robot)
+
+    def quick_gripper_button():
+        global Quick_grip
+        Quick_grip = not Quick_grip
+        if(Quick_grip == 0):
+            InOut_out[2] = 0
+            app.Quick_gripper_on_off.deselect()
+        else:
+            InOut_out[2] = 1
+            app.Quick_gripper_on_off.select()
+        logging.debug("Quick grip status is: ")
+        logging.debug(Quick_grip)
+
 
     def raise_frame_setting():
         app.settings_frame.tkraise()
@@ -995,40 +1155,101 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
     # This function periodically updates elements of the GUI that need to be updated
     def Stuff_To_Update():
         
-        logging.debug("test")
-        
+        #logging.debug("test")
+        global prev_string_shared
+
+        global x_value 
+        global y_value 
+        global z_value 
+        global Rx_pos 
+        global Ry_pos 
+        global Rz_pos 
+
+        global Joint1_value 
+        global Joint2_value 
+        global Joint3_value 
+        global Joint4_value 
+        global Joint5_value 
+        global Joint6_value 
+
+        shared_string_string = (shared_string.value).decode('utf-8')
+        if shared_string_string != prev_string_shared:
+            now = datetime.now()
+            time_string = now.strftime("%H:%M:%S")
+            prev_string_shared = shared_string_string
+
+            app.textbox_response.insert(tk.INSERT,time_string + "--" + shared_string_string + "\n")
+            app.textbox_response.see(tk.END)
+        else: 
+            prev_string_shared = shared_string_string
+
+        #app.textbox_response.insert(tk.INSERT,"tesT\n")
+
+        app.Input1.configure(app.IO_frame, text="INPUT 1: " + str(InOut_in[0]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.Input2.configure(app.IO_frame, text="INPUT 2: " + str(InOut_in[1]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.ESTOP_STATUS.configure(app.IO_frame, text="ESTOP: " + str(InOut_in[4]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.OUTPUT_1_LABEL.configure(app.IO_frame, text="OUTPUT 1 is: " + str(InOut_out[2]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.OUTPUT_2_LABEL.configure(app.IO_frame, text="OUTPUT 2 is: " + str(InOut_out[3]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        if( InOut_in[4] == 0):
+            app.estop_status.configure(app.bottom_select_frame, text="Estop active", font=customtkinter.CTkFont(size=15))
+        else: 
+            app.estop_status.configure(app.bottom_select_frame, text="", font=customtkinter.CTkFont(size=15))
+
+
+    
     # Tool positions
     # Use ik to calculate 
 
+        # Array of current joint positions in radians
         q1 = np.array([PAROL6_ROBOT.STEPS2RADS(Position_in[0],0),
                        PAROL6_ROBOT.STEPS2RADS(Position_in[1],1),
                        PAROL6_ROBOT.STEPS2RADS(Position_in[2],2),
                        PAROL6_ROBOT.STEPS2RADS(Position_in[3],3),
                        PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
                        PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
-        #print(q1)
+        # Get SE3 matrix of current joint positions
         T = PAROL6_ROBOT.robot.fkine(q1)
         b = T.t # get translation component
-        print(b*1000)
-        robot_pose[0] = b[0] * 1000
-        robot_pose[1] = b[1] * 1000
-        robot_pose[2] = b[2] * 1000
+        #print(b*1000)
+        robot_pose[0] = b[0] * 1000 #  X in mm
+        robot_pose[1] = b[1] * 1000 #  Y in mm
+        robot_pose[2] = b[2] * 1000 #  Z in mm
+
+        # - ``'xyz'``, rotate by yaw about the x-axis, then by pitch about the new y-axis,
+        # then by roll about the new z-axis. Convention for a robot gripper with z-axis forward
+        # and y-axis between the gripper fingers.
         robot_pose[3:] = T.rpy('deg','xyz') # get rotation component
   
-        app.x_pos.configure(text="X: "+ str(round(robot_pose[0],3)).rjust(7, ' '))	
-        app.y_pos.configure( text="Y: "+ str(round(robot_pose[1],3)).rjust(7, ' '))	
-        app.z_pos.configure(text="Z: "+ str(round(robot_pose[2],3)).rjust(7, ' '))	
-        app.Rx_pos.configure(text="Rx: "+ str(round(robot_pose[3],3)).rjust(7, ' '))	
-        app.Ry_pos.configure(text="Ry: "+ str(round(robot_pose[4],3)).rjust(7, ' '))	
-        app.Rz_pos.configure(text="Rz: "+ str(round(robot_pose[5],3)).rjust(7, ' '))	
+        x_value = str(round(robot_pose[0],3))
+        y_value = str(round(robot_pose[1],3))
+        z_value = str(round(robot_pose[2],3))
+        Rx_pos = str(round(robot_pose[3],3))
+        Ry_pos = str(round(robot_pose[4],3))
+        Rz_pos = str(round(robot_pose[5],3)) 
+
+        app.x_pos.configure(text="X: "+ x_value.rjust(7, ' '))	
+        app.y_pos.configure( text="Y: "+ y_value.rjust(7, ' '))	
+        app.z_pos.configure(text="Z: "+ z_value.rjust(7, ' '))	
+        app.Rx_pos.configure(text="Rx: "+ Rx_pos.rjust(7, ' '))	
+        app.Ry_pos.configure(text="Ry: "+ Ry_pos.rjust(7, ' '))	
+        app.Rz_pos.configure(text="Rz: "+ Rz_pos.rjust(7, ' '))	
 
     # Joint positions
-        app.theta1.configure(text="θ1: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[0],0),3)).rjust(7, ' '))
-        app.theta2.configure(text="θ2: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[1],1),3)).rjust(7, ' ')) 
-        app.theta3.configure(text="θ3: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[2],2),3)).rjust(7, ' '))
-        app.theta4.configure(text="θ4: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[3],3),3)).rjust(7, ' '))
-        app.theta5.configure(text="θ5: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[4],4),3)).rjust(7, ' '))
-        app.theta6.configure(text="θ6: " + str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[5],5),3)).rjust(7, ' '))
+
+        Joint1_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[0],0),3))
+        Joint2_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[1],1),3))
+        Joint3_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[2],2),3))
+        Joint4_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[3],3),3))
+        Joint5_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[4],4),3))
+        Joint6_value = str(round(PAROL6_ROBOT.STEPS2DEG(Position_in[5],5),3))
+
+
+        app.theta1.configure(text="θ1: " + Joint1_value.rjust(7, ' '))
+        app.theta2.configure(text="θ2: " + Joint2_value.rjust(7, ' '))
+        app.theta3.configure(text="θ3: " + Joint3_value.rjust(7, ' '))
+        app.theta4.configure(text="θ4: " + Joint4_value.rjust(7, ' '))
+        app.theta5.configure(text="θ5: " + Joint5_value.rjust(7, ' '))
+        app.theta6.configure(text="θ6: " + Joint6_value.rjust(7, ' '))
         
         prev_positions[0] = Position_in[0]
         prev_positions[1] = Position_in[1]
@@ -1038,19 +1259,24 @@ def GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_
         prev_positions[5] = Position_in[5]
 
         # Sliders
+        # Velocity slider
         v1 = app.slider1.get()
+        Jog_control[0] = int(v1)
+        # Acc slider
         v2 = app.slider2.get()
+        Jog_control[1] = int(v2)
         #Jog_control[0] = v1
         #Jog_control[1] = v2
         #logging.debug(Jog_control)
         app.Velocity_percent.configure(text= ""+ str(v1).rjust(4, ' ')+ "%")
         app.Accel_percent.configure(text= "" + str(v2).rjust(4, ' ') + "%")
 
-
+        highlight_words_response(None)
+        highlight_words_program(None)
         # If tab is joint jog
         # Update joint sliders
         for y in range(0,6):
-            app.progress_bar_joints[y].set(0.1)
+            app.progress_bar_joints[y].set(np.interp(Position_in[y],[PAROL6_ROBOT.Joint_limits_steps[y][0],PAROL6_ROBOT.Joint_limits_steps[y][1]],[0.0,1.0]))
             None
     
         app.after(66,Stuff_To_Update) # Update data every 66 ms ( 15 frames per second)
@@ -1115,14 +1341,15 @@ if __name__ == "__main__":
     Joint_jog_buttons = [0,0,0,0,0,0,0,0,0,0,0,0]
     Cart_jog_buttons = [0,0,0,0,0,0,0,0,0,0,0,0]
     # Speed slider, acc slider, WRF/TRF
-    Jog_control = [0,0,1,0]
+    Jog_control = [0,0,0,0]
     # COM PORT, BAUD RATE, 
     General_data = [8,3000000]
-    # Home,Enable,Disable,Clear error,Real_robot,Sim_robot
-    Buttons = [0,0,0,0,1,1]
+    # Home,Enable,Disable,Clear error,Real_robot,Sim_robot,Demo app,Program executions
+    Buttons = [0,0,0,0,1,1,0,0]
     
+    shared_string = multiprocessing.Array('c', b' ' * 100)
 
-    GUI(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out,
+    GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out,
          Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
          XTR_data,Gripper_data_in,
         Joint_jog_buttons,Cart_jog_buttons,Jog_control,General_data,Buttons)

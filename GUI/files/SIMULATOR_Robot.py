@@ -16,7 +16,7 @@ from tkinter.messagebox import showinfo
 import random
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.animation as animation
-from visual_kinematics.RobotSerial import *
+from s_visual_kinematics.RobotSerial import *
 import numpy as np
 from math import pi
 import PAROL6_ROBOT
@@ -45,7 +45,7 @@ customtkinter.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark",
 customtkinter.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
 
 
-def GUI(Position_out,Position_in,Position_Sim):
+def GUI(Position_out,Position_in,Position_Sim,Buttons):
 
     def show_robot(var):
         #print(var)
@@ -53,6 +53,10 @@ def GUI(Position_out,Position_in,Position_Sim):
         y = random.random()
         z = random.random()
         theta = np.array([y, z, -0.25 * pi, 0., x, 0.])
+        theta = np.array([PAROL6_ROBOT.STEPS2RADS(Position_in[0],0),PAROL6_ROBOT.STEPS2RADS(Position_in[1],1),
+                          PAROL6_ROBOT.STEPS2RADS(Position_in[2],2),PAROL6_ROBOT.STEPS2RADS(Position_in[3],3),
+                          PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),PAROL6_ROBOT.STEPS2RADS(Position_in[5],5)])
+        
         #theta = np.array([0, -pi/2, pi, 0., 0, pi])
         f = robot.forward(theta)      
         robot.draw()
@@ -90,11 +94,13 @@ def GUI(Position_out,Position_in,Position_Sim):
     f = robot.forward(theta)
 
     app = customtkinter.CTk()
+    app.lift()
+    app.attributes('-topmost',True)
     logging.debug("I RUN")
         # configure window
     app.title("Simulator.py")
-    app.geometry(f"{900}x{780}")
-    app.attributes('-topmost',False)
+    app.geometry(f"{750}x{680}")
+    app.wm_attributes('-topmost',False)
 
     # Add app icon
     logo = (os.path.join(Image_path, "logo.ico"))
@@ -121,13 +127,13 @@ def GUI(Position_out,Position_in,Position_Sim):
             Top_frame.grid_rowconfigure(0, weight=0)
 
         
-            Control_button = customtkinter.CTkButton( Top_frame,text="Pause", width= 50, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command=Pause)
+            Control_button = customtkinter.CTkButton( Top_frame,text="Pause", width= 50,fg_color ="#313838", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command=Pause)
             Control_button.grid(row=0, column=0, padx=20,pady = (5,5),sticky="news")
 
-            Config_button = customtkinter.CTkButton( Top_frame,text="Run", width= 50, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command=Run)
+            Config_button = customtkinter.CTkButton( Top_frame,text="Run", width= 50,fg_color ="#313838", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command=Run)
             Config_button.grid(row=0, column=1, padx=20,pady = (5,5),sticky="news")
 
-            Setup_button = customtkinter.CTkButton( Top_frame,text="Sync", width= 50, font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+            Setup_button = customtkinter.CTkButton( Top_frame,text="Sync", width= 50,fg_color ="#313838", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
             Setup_button.grid(row=0, column=2, padx=20,pady = (5,5),sticky="news")
 
     def Pause():
@@ -145,7 +151,7 @@ def GUI(Position_out,Position_in,Position_Sim):
     canvas.get_tk_widget().grid(row=1, column=1, padx=20,pady = (5,5),sticky="news")
 
 
-    ani = animation.FuncAnimation(fig, show_robot, frames=100, interval=100)
+    ani = animation.FuncAnimation(fig, show_robot, interval=30)
 
 
     app.mainloop() 
@@ -157,4 +163,6 @@ if __name__ == "__main__":
     Position_out = [1,11,111,1111,11111,10]
     Position_in = [31,32,33,34,35,36]
     Position_Sim = [1,2,3,4,5,6]
-    GUI(Position_out,Position_in,Position_Sim)
+    # Home,Enable,Disable,Clear error,Real_robot,Sim_robot
+    Buttons =  [0,0,0,0,1,1]
+    GUI(Position_out,Position_in,Position_Sim,Buttons)
