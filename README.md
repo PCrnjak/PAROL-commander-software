@@ -30,9 +30,18 @@ Github link for PAROL6 robotic arm is here!
 
 # How to install
 
-## Using pio
+# Install via pip
+```
+pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
+```
 
-## From github
+# Install via Github
+
+```
+git clone https://github.com/PCrnjak/s_visual_kinematics.git
+cd s_visual_kinematics
+pip3 install -e .
+```
 
 
 # How to run
