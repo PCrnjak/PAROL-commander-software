@@ -32,14 +32,14 @@ Github link for PAROL6 robotic arm is here!
 # How to install
 
     sudo apt install python3
-    ---> CURRENT VESRION IS INSTALLED: python3 is already the newest version (3.10.6-1~22.04).
+    ---> CURRENT VERSION INSTALLED: python3 is already the newest version (3.10.6-1~22.04).
     sudo apt install python3-pip
     sudo apt-get install git
     pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
     pip3 install customtkinter
     pip3 install customtkinter --upgrade
     pip3 install oclock
-    pip3 install serial
+    pip3 install pyserial
     git clone https://github.com/petercorke/robotics-toolbox-python.git
     cd robotics-toolbox-python
     pip3 install -e .
