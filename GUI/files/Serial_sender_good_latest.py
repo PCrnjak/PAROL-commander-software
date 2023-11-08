@@ -29,7 +29,7 @@ my_os = platform.system()
 if my_os == "Windows":
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Windows")
-else:
+else: 
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Linux")
 
@@ -39,13 +39,23 @@ logging.basicConfig(level = logging.DEBUG,
     datefmt='%H:%M:%S'
 )
 
+STARTING_PORT = 37
+# if using linux this will add dev/ttyACM + 37
+# if using windows this will add COM + 37
+str_port = ''
 logging.disable(logging.DEBUG)
-
-try:
-    ser = serial.Serial(port='COM8', baudrate=3000000, timeout=0)
-    None
-except:
-    None
+if my_os == "Windows":
+    try:
+        str_port = 'COM' + str(STARTING_PORT)
+        ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
+    except:
+        None
+elif my_os == "Linux":
+    try:
+        str_port = 'dev/ttyACM' + str(STARTING_PORT)
+        ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
+    except:
+        None
 #ser.open()
 
 # in big endian machines, first byte of binary representation of the multibyte data-type is stored first. 
@@ -1785,7 +1795,14 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
         else:
             try:
                 
-                ser.port = 'COM8'
+                print("i am here2")
+                if my_os == 'Linux':
+                    com_port = 'dev/ttyACM' + str(General_data[0])
+                elif my_os == 'Windows':
+                    com_port = 'COM' + str(General_data[0])
+                    
+                print(com_port)
+                ser.port = com_port
                 ser.baudrate = 3000000
                 ser.close()
                 time.sleep(0.5)
@@ -1813,7 +1830,7 @@ def extract_content_from_command(command):
 
 # Task that receives data and saves to the multi proc array
 def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
-         XTR_data,Gripper_data_in):
+         XTR_data,Gripper_data_in,General_data):
     while 1:
 
         #  PYTHON
@@ -1848,8 +1865,15 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
             #Get_data_old()
         except:
             try:
+                print("i am here")
+                if my_os == 'Linux':
+                    com_port = 'dev/ttyACM' + str(General_data[0])
+                elif my_os == 'Windows':
+                    com_port = 'COM' + str(General_data[0])
+                    
                 
-                ser.port = 'COM8'
+                print(com_port)
+                ser.port = com_port
                 ser.baudrate = 3000000
                 ser.close()
                 time.sleep(0.5)
@@ -1978,7 +2002,7 @@ def Task3(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
 
 
 
-        time.sleep(15)
+        time.sleep(3)
 
 
 
@@ -2540,7 +2564,7 @@ def Main(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InO
         Joint_jog_buttons,Cart_jog_buttons,Jog_control,General_data,Buttons))
     
     t2 = threading.Thread(target = Task2, args = (shared_string, Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
-         XTR_data,Gripper_data_in,))
+         XTR_data,Gripper_data_in,General_data,))
     
     t3 = threading.Thread(target = Task3,args = ( shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out,
          Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
@@ -2618,7 +2642,7 @@ if __name__ == '__main__':
     Jog_control = multiprocessing.Array("i",[0,0,0,0], lock=False) 
 
     # COM PORT, BAUD RATE, 
-    General_data =  multiprocessing.Array("i",[8,3000000], lock=False) 
+    General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000], lock=False) 
 
     # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,
     Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0], lock=False) 

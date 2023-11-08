@@ -24,6 +24,7 @@ import numpy as np
 from math import pi
 import PAROL6_ROBOT 
 from datetime import datetime
+import re
 
 logging.basicConfig(level = logging.DEBUG,
     format='%(asctime)s.%(msecs)03d %(levelname)s:\t%(message)s',
@@ -103,8 +104,10 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     app.geometry(f"{1700}x{1100}")
     app.attributes('-topmost',False)
     # Add app icon  
-    logo = (os.path.join(Image_path, "logo.ico"))
-    app.iconbitmap(logo)
+    if my_os == "Windows":
+        logo = (os.path.join(Image_path, "logo.ico"))
+        app.iconbitmap(logo)
+
 
     # configure grid layout (4x4) wight 0 znači da je fixed, 1 znači da scale radi?
     app.grid_columnconfigure((1,2), weight=1)
@@ -177,7 +180,10 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.radio_button_real.grid(row=3, column=4, pady=10, padx=padx_top_bot, sticky="e")
         app.radio_button_real.select()
 
-        app.Connect_button = customtkinter.CTkButton(app.bottom_select_frame,text="Connect", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.COMPORT = customtkinter.CTkEntry(app.bottom_select_frame, width= 150)
+        app.COMPORT.grid(row=3, column=5, padx=(0, 0),pady=(3,3),sticky="E")
+
+        app.Connect_button = customtkinter.CTkButton(app.bottom_select_frame,text="Connect", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Set_comm_port)
         app.Connect_button.grid(row=3, column=8, padx=padx_top_bot,pady = 10,sticky="e")
 
         app.Clear_error = customtkinter.CTkButton(app.bottom_select_frame,text="Clear error", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Clear_error)
@@ -910,6 +916,21 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     def Disable_press():
         Buttons[2] = 1
         logging.debug("Disable press")
+
+    def Set_comm_port():
+
+        COMPORT_value = app.COMPORT.get()
+        pattern = re.compile(r'\D*(\d+)\D*')
+        match = pattern.match(COMPORT_value)
+        if match:
+           com_number = int(match.group(1))
+           General_data[0] = com_number
+        else:
+             None  # Return None if no match is found
+
+        print(General_data[0])
+        
+        
 
     def Clear_error():
         Buttons[3] = 1

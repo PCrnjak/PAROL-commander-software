@@ -103,8 +103,9 @@ def GUI(Position_out,Position_in,Position_Sim,Buttons):
     app.wm_attributes('-topmost',False)
 
     # Add app icon
-    logo = (os.path.join(Image_path, "logo.ico"))
-    app.iconbitmap(logo)
+    if my_os == "Windows":
+        logo = (os.path.join(Image_path, "logo.ico"))
+        app.iconbitmap(logo)
 
     # configure grid layout (4x4) wight 0 znači da je fixed, 1 znači da scale radi?
     app.grid_columnconfigure((1,2), weight=1)
