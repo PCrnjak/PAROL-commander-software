@@ -5,19 +5,19 @@
 
 https://source-robotics.com
 
-Robot arm building instructions, STL files, BOM, PAROL6 control board code and schematics can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
+Robot arm building instructions, STL files, BOM, PAROL6 control board code, and schematics can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
 
-PAROL6 comamnder software is tool for controling and programming PAROL6 robotic arm!
+PAROL6 commander software is a tool for controlling and programming the PAROL6 robotic arm!
 Some of the features are: <br />
-* Loop rates of up to 100Hz allowing for real time control
+* Loop rates of up to 100Hz allowing for real-time control
 * Joint jogging
-* Cartesian level jogging in world reference frame and tool reference frame
+* Cartesian level jogging in the world reference frame and tool reference frame
 * Full telemetry data
 * Error handling like Inverse kinematics errors, Joint position limits, speed limits, Estop...
 * Response log 
-* Built in simulator
-* Programming interface with simple to use commands
-* Real time control of robot outputs and reading of inputs
+* Built-in simulator
+* Programming interface with simple-to-use commands
+* Real-time control of robot outputs and reading of inputs
 
 
 
@@ -27,9 +27,7 @@ Some of the features are: <br />
 
 PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
 
-Github link for PAROL6 robotic arm is here!
-
-# How to install
+# How to install Linux
 
     sudo apt install python3
     ---> CURRENT VERSION INSTALLED: python3 is already the newest version (3.10.6-1~22.04).
@@ -52,25 +50,29 @@ Github link for PAROL6 robotic arm is here!
 ## Clone
     git clone https://github.com/PCrnjak/PAROL-commander-software.git
 
-## To run go to install  directory and
+## To run go to the install directory and
     python3 Serial_sender_good_latest.py
 
 
-## If using visual studio code
+## If using Visual Studio code
     install python extension
 
 ## If getting serial errors try:
     sudo chmod 666 /dev/ttyAMA0
 
-## To find serial device try this:
+## To find the serial device try this:
 https://askubuntu.com/questions/398941/find-which-tty-device-connected-over-usb
+
+# How to install Windows
+
+**Coming soon**
 
 # Install via pip
 ```
 pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
 ```
 
-# Install via Github
+# Install via GitHub
 
 ```
 git clone https://github.com/PCrnjak/s_visual_kinematics.git
@@ -78,16 +80,12 @@ cd s_visual_kinematics
 pip3 install -e .
 ```
 
-
-# How to run
-
-
 # Dependency
 
 
 # Documentation:
 
-How to use PAROL commander software can be found in [DOCS](https://pcrnjak.github.io/PAROL-docs/)
+How to use PAROL commander software can be found in [DOCS](https://source-robotics.github.io/PAROL-docs/)
 
 
 # More about PAROL6
@@ -97,14 +95,6 @@ Join [Discord](https://discord.com/invite/prjUvjmGpZ ) community!
 - [Instagram](https://www.instagram.com/5arcrnjak/)
 - [DOCS](https://source-robotics.github.io/PAROL-docs/)
 
-
-# Support the project
-
-All the code and STL files needed to build the robot are Open source and free to all and I would like to keep it that way. Any help 
-in terms of donations, advice, or contribution is really appreciated. Thank you!
-
-
-[<img src="Images/Donate.png" width="200">](http://google.com.au/)
 
 
 # Project is under GPLv3 Licence
