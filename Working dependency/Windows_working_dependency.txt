@@ -1,0 +1,12 @@
+roboticstoolbox-python==1.0.3
+spatialgeometry==1.0.3
+spatialmath-python==1.0.3
+-e git+https://github.com/PCrnjak/s_visual_kinematics.git@f5204c9e0d29818d65f7280ef12f93ea82b61395#egg=s_visual_kinematics
+customtkinter==5.1.2
+numpy==1.23.4
+matplotlib==3.6.2
+pyserial==3.5
+oclock==1.3.0
+swift-sim==1.0.1
+spatialgeometry==1.0.3
+spatialmath-python==1.0.3
