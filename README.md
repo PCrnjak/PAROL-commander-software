@@ -67,6 +67,10 @@ https://askubuntu.com/questions/398941/find-which-tty-device-connected-over-usb
 
 **Coming soon**
 
+# Trouble installing?
+
+Check working dependency folder for working and tested versions of your python packages!
+
 # Install via pip
 ```
 pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
