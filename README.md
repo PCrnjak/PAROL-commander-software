@@ -50,6 +50,24 @@ Join [Discord](https://discord.com/invite/prjUvjmGpZ ) community!
 - [Instagram](https://www.instagram.com/5arcrnjak/)
 - [DOCS](https://source-robotics.github.io/PAROL-docs/)
 
+  
+# 📢📢Contributing to the project 📢📢
+Some features are still missing on the software and hardware side of the PAROL6.<br />
+If you want to contribute to the project and don't know how you can help in the implementation of some of these features:
+
+General features:
+  - ROS2 support
+  - Moveit example
+  - ROBODK postprocessor
+
+  PAROL6 commander software features:
+  - Reading GCODE commands
+  - Reading inputs
+  - implementing flow control
+  - Graphical simulator?
+  - Saving programs to the Control board Flash
+  - Offline execution of the code (from the flash)
+  - Blending in trajectory planner
 
 
 # Project is under GPLv3 Licence
