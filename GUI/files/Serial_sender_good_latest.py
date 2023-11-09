@@ -39,7 +39,7 @@ logging.basicConfig(level = logging.DEBUG,
     datefmt='%H:%M:%S'
 )
 
-STARTING_PORT = 37
+STARTING_PORT = 36
 # if using linux this will add dev/ttyACM + 37
 # if using windows this will add COM + 37
 str_port = ''
@@ -49,13 +49,13 @@ if my_os == "Windows":
         str_port = 'COM' + str(STARTING_PORT)
         ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
     except:
-        None
+        ser = serial.Serial()
 elif my_os == "Linux":
     try:
         str_port = 'dev/ttyACM' + str(STARTING_PORT)
         ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
     except:
-        None
+        ser = serial.Serial()
 #ser.open()
 
 # in big endian machines, first byte of binary representation of the multibyte data-type is stored first. 
@@ -1795,7 +1795,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
         else:
             try:
                 
-                print("i am here2")
+                
                 if my_os == 'Linux':
                     com_port = 'dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
@@ -1864,8 +1864,8 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
          XTR_data,Gripper_data_in)
             #Get_data_old()
         except:
-            try:
-                print("i am here")
+            try: 
+                
                 if my_os == 'Linux':
                     com_port = 'dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
