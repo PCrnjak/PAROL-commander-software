@@ -21,30 +21,26 @@ Some of the features are: <br />
 * Programming interface with simple-to-use commands
 * Real-time control of robot outputs and reading of inputs
 
-# Minimal hardware requirements
-
-To run the PAROL6 robotic arm with commander software you will need to meet some minimal PC specifications.
-Check already tested systems and compare to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
-
-# How to install 
-How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)
-How to install on the Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
-
 # What is PAROL6 robotic arm?
 
 PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
 
-# Hardware Requirements
-To run this software you will need to meet some minimal PC requirements
+# Minimal hardware requirements
 
-# How to install
+To run the PAROL6 robotic arm with commander software you will need to meet some minimal PC specifications.
+Check already tested systems and compare them to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
+
+# How to install 
+How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)
+How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
 
 # Dependency
+
+You can compare what Python modules are used on the systems that are proven to work!
 
 # Documentation:
 
 How to use PAROL commander software can be found in [DOCS](https://source-robotics.github.io/PAROL-docs/)
-
 
 # More about PAROL6
 Join [Discord](https://discord.com/invite/prjUvjmGpZ ) community!
