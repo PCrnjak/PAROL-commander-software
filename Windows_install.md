@@ -19,7 +19,7 @@
     pip3 install progress
   
 ## Clone commander repo
-git clone https://github.com/PCrnjak/PAROL-commander-software.git
+    git clone https://github.com/PCrnjak/PAROL-commander-software.git
 
 ## To run go to the install directory and
     python3 Serial_sender_good_latest.py
