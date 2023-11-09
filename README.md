@@ -5,7 +5,9 @@
 
 https://source-robotics.com
 
-Robot arm building instructions, STL files, BOM, PAROL6 control board code, and schematics can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
+Robot arm building instructions, STL files, BOM can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
+
+To run this code you need to use PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
 
 PAROL6 commander software is a tool for controlling and programming the PAROL6 robotic arm!
 Some of the features are: <br />
@@ -19,10 +21,10 @@ Some of the features are: <br />
 * Programming interface with simple-to-use commands
 * Real-time control of robot outputs and reading of inputs
 
-
-PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
-
 # Minimal hardware requirements
+
+To run the PAROL6 robotic arm with commander software you will need to meet some minimal PC specifications.
+Check already tested systems and compare to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
 # How to install 
 
