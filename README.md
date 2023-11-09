@@ -27,6 +27,8 @@ To run the PAROL6 robotic arm with commander software you will need to meet some
 Check already tested systems and compare to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
 # How to install 
+How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)
+How to install on the Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
 
 # What is PAROL6 robotic arm?
 
