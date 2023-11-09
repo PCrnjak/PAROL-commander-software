@@ -19,12 +19,25 @@ Some of the features are: <br />
 * Programming interface with simple-to-use commands
 * Real-time control of robot outputs and reading of inputs
 
+<<<<<<< Updated upstream
 
 PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
 
 # Minimal hardware requirements
 
 # How to install 
+=======
+# What is PAROL6 robotic arm?
+
+<img src="Images/img3.png" alt="drawing" width="5000"/>
+
+PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
+
+# Hardware Requirements
+To run this software you will need to meet some minimal PC requirements
+
+# How to install
+>>>>>>> Stashed changes
 
 # Dependency
 
