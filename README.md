@@ -27,65 +27,11 @@ Some of the features are: <br />
 
 PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach of PAROL6 was to be similar to industrial robots in terms of mechanical design, control software, and usability. Control software, GUI, and robots STL files are open-source. You can build your own PAROL6 robot by following the instructions on this page.
 
-# How to install Linux
+# Minimal hardware requirements
 
-    sudo apt install python3
-    ---> CURRENT VERSION INSTALLED: python3 is already the newest version (3.10.6-1~22.04).
-    sudo apt install python3-pip
-    sudo apt-get install git
-    pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
-    pip3 install customtkinter
-    pip3 install customtkinter --upgrade
-    pip3 install oclock
-    pip3 install pyserial
-    git clone https://github.com/petercorke/robotics-toolbox-python.git
-    cd robotics-toolbox-python
-    pip3 install -e .
-    pip3 install swift-sim
-    sudo apt-get install python3-tk
-    pip3 install pgraph-python
-    pip3 install progress
-    sudo apt-get install python3-pil python3-pil.imagetk
-
-## Clone
-    git clone https://github.com/PCrnjak/PAROL-commander-software.git
-
-## To run go to the install directory and
-    python3 Serial_sender_good_latest.py
-
-
-## If using Visual Studio code
-    install python extension
-
-## If getting serial errors try:
-    sudo chmod 666 /dev/ttyAMA0
-
-## To find the serial device try this:
-https://askubuntu.com/questions/398941/find-which-tty-device-connected-over-usb
-
-# How to install Windows
-
-**Coming soon**
-
-# Trouble installing?
-
-Check working dependency folder for working and tested versions of your python packages!
-
-# Install via pip
-```
-pip3 install git+https://github.com/PCrnjak/s_visual_kinematics.git@main#egg=s_visual_kinematics
-```
-
-# Install via GitHub
-
-```
-git clone https://github.com/PCrnjak/s_visual_kinematics.git
-cd s_visual_kinematics
-pip3 install -e .
-```
+# How to install 
 
 # Dependency
-
 
 # Documentation:
 
