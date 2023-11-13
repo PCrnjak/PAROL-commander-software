@@ -39,9 +39,12 @@ logging.basicConfig(level = logging.DEBUG,
     datefmt='%H:%M:%S'
 )
 
-STARTING_PORT = 36
-# if using linux this will add dev/ttyACM + 37
-# if using windows this will add COM + 37
+if my_os == "Windows": 
+    STARTING_PORT = 3 # COM3
+else:   
+    STARTING_PORT = 0
+# if using linux this will add /dev/ttyACM + 0 ---> /dev/ttyACM0
+# if using windows this will add COM + 3 ---> COM3 
 str_port = ''
 logging.disable(logging.DEBUG)
 if my_os == "Windows":
@@ -52,7 +55,7 @@ if my_os == "Windows":
         ser = serial.Serial()
 elif my_os == "Linux":
     try:
-        str_port = 'dev/ttyACM' + str(STARTING_PORT)
+        str_port = '/dev/ttyACM' + str(STARTING_PORT)
         ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
     except:
         ser = serial.Serial()
@@ -1797,7 +1800,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 
                 
                 if my_os == 'Linux':
-                    com_port = 'dev/ttyACM' + str(General_data[0])
+                    com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
                     
@@ -1867,7 +1870,7 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
             try: 
                 
                 if my_os == 'Linux':
-                    com_port = 'dev/ttyACM' + str(General_data[0])
+                    com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
                     
