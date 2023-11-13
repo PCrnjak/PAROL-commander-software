@@ -9,9 +9,7 @@
     pip3 install oclock
     pip3 install pyserial
     
-    git clone https://github.com/petercorke/robotics-toolbox-python.git
-    cd robotics-toolbox-python
-    pip3 install -e .
+     pip3 install roboticstoolbox-python==1.0.3
     
     pip3 install swift-sim
     sudo apt-get install python3-tk
