@@ -28,8 +28,8 @@ git clone https://github.com/PCrnjak/PAROL-commander-software.git
 ## If using Visual Studio code
     install python extension
 
-## If getting serial errors try:
-    sudo chmod 666 /dev/ttyAMA0
+## If getting serial errors try (0 might be some other number depending on what com port your robot was assigned to):
+    sudo chmod 666 /dev/ttyAMA0 
 
 ## To find the serial device try this:
 https://askubuntu.com/questions/398941/find-which-tty-device-connected-over-usb
