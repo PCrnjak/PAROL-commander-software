@@ -28,3 +28,6 @@
     install python extension
     Run in the VS code
 
+## If connecting over GUI enter (x is your port number):
+    COMx 
+Press connect multiple times
