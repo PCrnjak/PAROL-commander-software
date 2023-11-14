@@ -10,11 +10,12 @@
     pip3 install oclock
     pip3 install pyserial
     pip3 install roboticstoolbox-python==1.0.3
-    pip3 install swift-sim
+    pip3 install swift-sim==1.0.1
     sudo apt-get install python3-tk
     pip3 install pgraph-python
-    pip3 install progress
+    pip3 install progress 
     sudo apt-get install python3-pil python3-pil.imagetk
+    pip3 install numpy==1.23.4
 
 ## Clone
 git clone https://github.com/PCrnjak/PAROL-commander-software.git
