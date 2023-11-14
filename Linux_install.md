@@ -36,3 +36,6 @@ https://askubuntu.com/questions/398941/find-which-tty-device-connected-over-usb
 ## If connecting over GUI enter (x is your port number):
     ttyACMx 
 Press connect multiple times
+
+## Troubleshooting
+Check In https://github.com/PCrnjak/PAROL-commander-software/tree/main/Working%20dependency what python module versions were used on working systems
