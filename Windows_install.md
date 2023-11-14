@@ -15,6 +15,7 @@
     sudo apt-get install python3-tk
     pip3 install pgraph-python
     pip3 install progress
+    pip3 install numpy==1.23.4
   
 ## Clone commander repo
     git clone https://github.com/PCrnjak/PAROL-commander-software.git
