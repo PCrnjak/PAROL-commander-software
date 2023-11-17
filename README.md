@@ -72,5 +72,8 @@ General features:
   - Offline execution of the code (from the flash)
   - Blending in trajectory planner
 
+# Liability 
+1. The software is still in development and may contain bugs, errors, or incomplete features.
+2. Users are encouraged to use this software responsibly and at their own risk.
 
 # Project is under GPLv3 Licence
