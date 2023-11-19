@@ -1777,10 +1777,10 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             Robot_mode = "Dummy"
                             Buttons[7] = 0
                            
-                        
-                
-
-
+            elif Buttons[8] == 1: # PARK COMMAND 0x104
+                Command_out.value = 104
+                Buttons[8] = 0
+                shared_string.value = b'Log: Robot parking'
 
             ######################################################
             ######################################################
@@ -2001,6 +2001,8 @@ def Task3(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
         print(shared_string.value)
         print("Program execution variable: ",end="")
         print(Buttons[7])
+        print("Park button state: ",end="")
+        print(Buttons[8])
 
 
 
@@ -2647,8 +2649,8 @@ if __name__ == '__main__':
     # COM PORT, BAUD RATE, 
     General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000], lock=False) 
 
-    # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,
-    Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0], lock=False) 
+    # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,park
+    Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0,0], lock=False) 
 
     # Positions for robot simulator
     Position_Sim =  multiprocessing.Array("i",[0,0,0,0,0,0], lock=False) 

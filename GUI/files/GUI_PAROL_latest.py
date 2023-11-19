@@ -671,12 +671,13 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.enable_disable_2.grid(row=6, column=3, padx=padx_top_bot,pady = 10,sticky="e")
 
         app.Quick_gripper_on_off = customtkinter.CTkRadioButton(master=app.joint_positions_frame, text="Gripper On/Off",  command = quick_gripper_button )
-        app.Quick_gripper_on_off.grid(row=6, column=4, pady=10, padx=20, sticky="we")
+        app.Quick_gripper_on_off.grid(row=7, column=4, pady=10, padx=20, sticky="we")
 
         app.home = customtkinter.CTkButton(app.joint_positions_frame,text="Home", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Home_robot)
         app.home.grid(row=5, column=4, padx=padx_top_bot,pady = 10,sticky="e")
 
-
+        app.home = customtkinter.CTkButton(app.joint_positions_frame,text="Park", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Park_robot)
+        app.home.grid(row=6, column=4, padx=padx_top_bot,pady = 10,sticky="e") 
         
     def highlight_words_program(event):
         app.textbox_program.tag_config("green", foreground="green")
@@ -1107,7 +1108,9 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     def Home_robot():
         logging.debug("Home button pressed")
         Buttons[0] = 1
-
+    def Park_robot():
+        logging.debug("Park button pressed")
+        Buttons[8] = 1
     def Open_help():
         messagebox.showwarning("test","test2")
         messagebox.showerror("test","test2")
@@ -1366,7 +1369,7 @@ if __name__ == "__main__":
     # COM PORT, BAUD RATE, 
     General_data = [8,3000000]
     # Home,Enable,Disable,Clear error,Real_robot,Sim_robot,Demo app,Program executions
-    Buttons = [0,0,0,0,1,1,0,0]
+    Buttons = [0,0,0,0,1,1,0,0,0]
     
     shared_string = multiprocessing.Array('c', b' ' * 100)
 
