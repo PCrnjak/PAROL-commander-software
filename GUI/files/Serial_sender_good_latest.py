@@ -25,6 +25,8 @@ from spatialmath.base.argcheck import (
     isscalar,
 )
 
+
+
 my_os = platform.system()
 if my_os == "Windows":
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
@@ -40,7 +42,7 @@ logging.basicConfig(level = logging.DEBUG,
 )
 
 if my_os == "Windows": 
-    STARTING_PORT = 3 # COM3
+    STARTING_PORT = 37 # COM3
 else:   
     STARTING_PORT = 0
 # if using linux this will add /dev/ttyACM + 0 ---> /dev/ttyACM0
@@ -392,6 +394,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 Command_out.value = 100
                 Buttons[0] = 0
                 shared_string.value = b'Log: Robot homing'
+
             
             elif Buttons[1] == 1: # ENABLE COMMAND 0x101
                 Command_out.value = 101 
@@ -2001,7 +2004,8 @@ def Task3(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
         print(shared_string.value)
         print("Program execution variable: ",end="")
         print(Buttons[7])
-
+        print("Park button state: ",end="")
+        print(Buttons[8])
 
 
 
@@ -2608,7 +2612,10 @@ if __name__ == '__main__':
 
     # Data sent by the PC to the robot
     Position_out = multiprocessing.Array("i",[1,11,111,1111,11111,10], lock=False) 
-    Speed_out = multiprocessing.Array("i",[2,21,22,23,24,25], lock=False) 
+
+    Speed_out = multiprocessing.Array("i",[2,21,22,23,24,25], lock=True)
+
+
     Command_out = multiprocessing.Value('i',0) 
     Affected_joint_out = multiprocessing.Array("i",[1,1,1,1,1,1,1,1], lock=False) 
     InOut_out = multiprocessing.Array("i",[0,0,0,0,0,0,0,0], lock=False) #IN1,IN2,OUT1,OUT2,ESTOP
@@ -2648,7 +2655,7 @@ if __name__ == '__main__':
     General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000], lock=False) 
 
     # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,
-    Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0], lock=False) 
+    Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0,0], lock=False) 
 
     # Positions for robot simulator
     Position_Sim =  multiprocessing.Array("i",[0,0,0,0,0,0], lock=False) 
