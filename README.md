@@ -5,6 +5,8 @@
 
 https://source-robotics.com
 
+To use commander software your PC needs to meet some [minimal hardware specs!](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
+
 Robot arm building instructions, STL files, BOM can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
 
 To run this code you need to use PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
