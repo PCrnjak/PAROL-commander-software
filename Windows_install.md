@@ -12,7 +12,6 @@
      pip3 install roboticstoolbox-python==1.0.3
     
     pip3 install swift-sim==1.0.1
-    sudo apt-get install python3-tk
     pip3 install pgraph-python
     pip3 install progress
     pip3 install numpy==1.23.4
