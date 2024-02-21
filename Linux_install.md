@@ -16,6 +16,7 @@
     pip3 install progress 
     sudo apt-get install python3-pil python3-pil.imagetk
     pip3 install numpy==1.23.4
+    pip3 install scipy==1.11.4
 
 ## Clone
 git clone https://github.com/PCrnjak/PAROL-commander-software.git
