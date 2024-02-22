@@ -33,8 +33,16 @@ To run the PAROL6 robotic arm with commander software you will need to meet some
 Check already tested systems and compare them to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
 # How to install 
+**Manual**
 How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)<br />
 How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
+
+**Using requirements.txt**
+pip install -r requirements.txt
+
+For linux you will also have to:
+sudo apt-get install python3-tk
+sudo apt-get install python3-pil python3-pil.imagetk
 
 # Dependency
 
