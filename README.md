@@ -40,9 +40,9 @@ How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-sof
 **Using requirements.txt**<br />
 pip install -r requirements.txt
 
-For linux you will also have to:
-sudo apt-get install python3-tk
-sudo apt-get install python3-pil python3-pil.imagetk
+For linux you will also have to:<br />
+sudo apt-get install python3-tk<br />
+sudo apt-get install python3-pil python3-pil.imagetk<br />
 
 # Dependency
 
