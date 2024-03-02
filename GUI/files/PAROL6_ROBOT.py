@@ -95,7 +95,7 @@ Cart_ang_velocity_limits = [[-100,100],[-100,100],[-100,100]]
 
 
 Commands_list = [ "Input","Output","Dummy","Begin","Home","Delay","End","Loop","MoveJoint","MovePose","SpeedJoint","MoveCart",
-                 "MoveCart","MoveCartRelTRF"]
+                 "MoveCart","MoveCartRelTRF","Gripper","Gripper_cal"]
 
 Commands_list_true = [item + "()" for item in Commands_list]
 
@@ -160,6 +160,47 @@ def RAD_SEC_2_DEG_SEC(rad_per_sec):
 
 def DEG_SEC_2_RAD_SEC(deg_per_sec):
     return deg_per_sec * deg_per_sec_2_radian_per_sec_const
+
+
+def extract_from_can_id(can_id):
+    # Extracting ID2 (first 4 MSB)
+    id2 = (can_id >> 7) & 0xF
+
+    # Extracting CAN Command (next 6 bits)
+    can_command = (can_id >> 1) & 0x3F
+
+    # Extracting Error Bit (last bit)
+    error_bit = can_id & 0x1
+    
+    return id2, can_command, error_bit
+
+
+def combine_2_can_id(id2, can_command, error_bit):
+    # Combine components into an 11-bit CAN ID
+    can_id = 0
+
+    # Add ID2 (first 4 MSB)
+    can_id |= (id2 & 0xF) << 7
+
+    # Add CAN Command (next 6 bits)
+    can_id |= (can_command & 0x3F) << 1
+
+    # Add Error Bit (last bit)
+    can_id |= (error_bit & 0x1)
+
+    return can_id
+
+# Fuse bitfield list to byte
+def fuse_bitfield_2_bytearray(var_in):
+    number = 0
+    for b in var_in:
+        number = (2 * number) + b
+    return bytes([number])
+
+# Splits byte to bitfield list
+def split_2_bitfield(var_in):
+    #return [var_in >> i & 1 for i in range(7,-1,-1)] 
+    return [(var_in >> i) & 1 for i in range(7, -1, -1)]
 
 
 if __name__ == "__main__":

@@ -141,6 +141,11 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
             #s = Pack_data_test() 
             # This function packs data that we will send to the robot
             s = Pack_data(Position_out,Speed_out,Command_out,Affected_joint_out,InOut_out,Timeout_out,Gripper_data_out)
+            
+            # Make sure if sending calib to gripper to send it only once
+            if(Gripper_data_out[4] == 1 or Gripper_data_out[4] == 2):
+                Gripper_data_out[4] = 0
+
             logging.debug(s)
             logging.debug("END of data sent to the ROBOT")
             len_ = len(s)
@@ -1258,9 +1263,6 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                 Program_step = Program_step + 1
 
 
-
-
-
                         # Move in cartesian space command
                         elif clean_string[Program_step] == 'MoveCart()':
                             # This code will execute once per command call
@@ -1779,6 +1781,42 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             Program_step = 1
                             Robot_mode = "Dummy"
                             Buttons[7] = 0
+
+
+                         # Gripper command
+                        elif clean_string[Program_step] == 'Gripper()':
+
+                            pattern = r'Gripper\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)'
+                            match = re.match(pattern, clean_string_commands[Program_step])
+                            if match:
+
+                                match_1 = int(match.group(1))
+                                match_2 = int(match.group(2))
+                                match_3 = int(match.group(3))
+                                if(match_1>= 0 and match_1<=255 and match_2>= 0 and match_2<=255 and match_3>= 100 and match_3<=1000):
+                                    shared_string.value = b'Log: Gripper() command'
+                                    Gripper_data_out[0] = match_1
+                                    Gripper_data_out[1] = match_2
+                                    Gripper_data_out[2] = match_3
+                                else: 
+                                    shared_string.value = b'Log: Error: Gripper() invalid input value'
+                            else:
+                                shared_string.value = b'Log: Error: Gripper() command'
+
+
+                            logging.debug('Log: Gripper() command')
+                            Program_step = Program_step + 1
+                            #Robot_mode = "Dummy"
+                            #Buttons[7] = 0
+
+                        # Gripper_cal command
+                        elif clean_string[Program_step] == 'Gripper_cal()':
+                            logging.debug('Log: Gripper_cal() command')
+                            shared_string.value = b'Log: Gripper calibration command'
+                            Gripper_data_out[4] = 1
+                            Program_step = Program_step + 1
+                            #Robot_mode = "Dummy"
+                            #Buttons[7] = 0
                            
                         
                 
@@ -2621,7 +2659,7 @@ if __name__ == '__main__':
     InOut_out = multiprocessing.Array("i",[0,0,0,0,0,0,0,0], lock=False) #IN1,IN2,OUT1,OUT2,ESTOP
     Timeout_out = multiprocessing.Value('i',0) 
     #Positon,speed,current,command,mode,ID
-    Gripper_data_out = multiprocessing.Array("i",[1,1,1,1,1,1], lock=False)
+    Gripper_data_out = multiprocessing.Array("i",[1,1,1,1,0,0], lock=False)
 
     # Data sent from robot to PC
     Position_in = multiprocessing.Array("i",[31,32,33,34,35,36], lock=False) 

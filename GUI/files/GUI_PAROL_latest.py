@@ -56,6 +56,9 @@ left_right_select = "Left"
 Quick_grip = 0
 Now_open_txt = ''
 prev_string_shared = ""
+Gripper_activate_deactivate = 1
+Gripper_action_status = 1
+Gripper_rel_dir = 1
 
 # These are the values that are displayed in the gui and are updated every xx ms
 x_value = ""
@@ -148,7 +151,7 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.Plot_button.grid(row=0, column=4, padx=(padx_top_bot,0) ,pady = 5,sticky="nw")
 
         # Gripper button
-        app.Plot_button = customtkinter.CTkButton(app.menu_select_frame,text="Gripper", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
+        app.Plot_button = customtkinter.CTkButton(app.menu_select_frame,text="Gripper", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'), command = raise_gripper_frame)
         app.Plot_button.grid(row=0, column=4, padx=(padx_top_bot,0) ,pady = 5,sticky="nw")
 
         app.fw_label = customtkinter.CTkLabel(app.menu_select_frame, text="Source controller fw version: 1.0.0", font=customtkinter.CTkFont(size=12))
@@ -314,9 +317,13 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     app.Calibrate_frame.grid_rowconfigure(0, weight=0)
 
 
+    app.Gripper_frame = customtkinter.CTkFrame(app,height = 100, width = left_frames_width, corner_radius=0, )
+    app.Gripper_frame.grid(row=1, column=0, columnspan=1,rowspan=2,  padx=(5,0), pady=5, sticky="news")
+    app.Gripper_frame.grid_columnconfigure(0, weight=0)
+    app.Gripper_frame.grid_rowconfigure(0, weight=0)
+
+
     def settings_frame():
-        app.demo1 = customtkinter.CTkButton(app.settings_frame,text="demo1", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'))
-        app.demo1.grid(row=0, column=0, padx=20,pady = (10,20),sticky="news")
 
         app.scaling_label = customtkinter.CTkLabel(app.settings_frame, text="UI Scaling:", anchor="w")
         app.scaling_label.grid(row=0, column=1, padx=(5, 0))
@@ -362,11 +369,6 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
 
 
     def Calibrate_frame():
-        app.demo2 = customtkinter.CTkButton(app.Calibrate_frame,text="demo1 start", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_start)
-        app.demo2.grid(row=0, column=1, padx=20,pady = (10,20),sticky="news")
-
-        app.demo3 = customtkinter.CTkButton(app.Calibrate_frame,text="demo1 stop", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
-        app.demo3.grid(row=1, column=1, padx=20,pady = (10,20),sticky="news")
 
         app.disable_motor = customtkinter.CTkButton(app.Calibrate_frame,text="Disable motor", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = demo_stop)
         app.disable_motor.grid(row=2, column=1, padx=20,pady = (10,20),sticky="news")
@@ -380,6 +382,117 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.joint_select = customtkinter.CTkOptionMenu(app.Calibrate_frame, values=["Joint 1", "Joint 2", "Joint 3", "Joint 4", "Joint 5","Joint 6"],
                                                             command=change_scaling_event)
         app.joint_select.grid(row=2, column=4,padx=(5, 0) )
+
+
+    def Gripper_frame():
+        # Devicee info
+        # Activate/deactivate
+        # Auto release direction
+        # Calibrate
+
+        app.Gripper_ID = customtkinter.CTkLabel(app.Gripper_frame, text="Gripper ID is: " + str(0), font=customtkinter.CTkFont(size=text_size))
+        app.Gripper_ID.grid(row=0, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_cal_status = customtkinter.CTkLabel(app.Gripper_frame, text="Calibration status is: " + str(0), font=customtkinter.CTkFont(size=text_size))
+        app.grip_cal_status.grid(row=0, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.Error_status_grip = customtkinter.CTkLabel(app.Gripper_frame, text="Error status is: " + str(InOut_out[2]).rjust(7, ' '), font=customtkinter.CTkFont(size=text_size))
+        app.Error_status_grip.grid(row=0, column=2, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_activate_radio = customtkinter.CTkRadioButton(master=app.Gripper_frame, text="Activate",  value=2,command = Select_gripper_activate)
+        app.grip_activate_radio.grid(row=1, column=0, pady=10, padx=padx_top_bot, sticky="news")
+        app.grip_activate_radio.select()
+
+        app.grip_calibrate = customtkinter.CTkButton(app.Gripper_frame,text="Calibrate gripper", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Gripper_calibrate)
+        app.grip_calibrate.grid(row=1, column=1, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_clear_error = customtkinter.CTkButton(app.Gripper_frame,text="Clear gripper error", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Gripper_clear_error)
+        app.grip_clear_error.grid(row=1, column=2, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_setpoints = customtkinter.CTkLabel(app.Gripper_frame, text="Command parameters", font=customtkinter.CTkFont(size=text_size))
+        app.grip_setpoints.grid(row=2, column=0, padx=20,pady = (10,20),sticky="news")
+
+        # Pos
+        #app.grip_pos_label = customtkinter.CTkLabel(app.Gripper_frame, text="Position setpoint", font=customtkinter.CTkFont(size=text_size))
+        #pp.grip_pos_label.grid(row=3, column=0, padx=20,pady = (5,5),sticky="news")
+
+        app.grip_pos_slider = customtkinter.CTkSlider(app.Gripper_frame,from_ = 0, to = 255,number_of_steps=255)
+        app.grip_pos_slider.set(10)
+        app.grip_pos_slider.grid(row=3, column=1,columnspan=1, padx=(0, 10), pady=(5, 5), sticky="news")
+
+        app.grip_pos_percent = customtkinter.CTkLabel(app.Gripper_frame,text="100%", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
+        app.grip_pos_percent.grid(row=3, column=2, padx=5,pady = (5,5),sticky="news")
+
+        app.grip_pos_entry = customtkinter.CTkEntry(app.Gripper_frame, width= 150)
+        app.grip_pos_entry.grid(row= 3, column=3, padx=(0, 0),pady=(3,3),sticky="E")
+
+        app.grip_pos_set = customtkinter.CTkButton(app.Gripper_frame,text="Position setpoint", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Set_gripper_pos)
+        app.grip_pos_set.grid(row=3, column=0, padx=20,pady = (3,3),sticky="news")
+
+
+        # Speed
+        #app.grip_speed_label = customtkinter.CTkLabel(app.Gripper_frame, text="Speed setpoint", font=customtkinter.CTkFont(size=text_size))
+        #app.grip_speed_label.grid(row=5, column=0, padx=20,pady = (5,5),sticky="news")
+
+        app.grip_speed_slider = customtkinter.CTkSlider(app.Gripper_frame,from_ = 0, to = 255,number_of_steps=255)
+        app.grip_speed_slider.set(50)
+        app.grip_speed_slider.grid(row=5, column=1,columnspan=1, padx=(0, 10), pady=(5, 5), sticky="news")
+
+        app.grip_speed_percent = customtkinter.CTkLabel(app.Gripper_frame,text="100%", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
+        app.grip_speed_percent.grid(row=5, column=2, padx=5,pady = (5,5),sticky="news")
+
+        app.grip_speed_entry = customtkinter.CTkEntry(app.Gripper_frame, width= 150)
+        app.grip_speed_entry.grid(row= 5, column=3, padx=(0, 0),pady=(3,3),sticky="E")
+
+        app.grip_speed_set = customtkinter.CTkButton(app.Gripper_frame,text="Speed setpoint", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Set_gripper_vel)
+        app.grip_speed_set.grid(row=5, column=0, padx=20,pady = (3,3),sticky="news")  
+
+
+
+         # Current
+        #app.grip_current_label = customtkinter.CTkLabel(app.Gripper_frame, text="Current setpoint", font=customtkinter.CTkFont(size=text_size))
+        #app.grip_current_label.grid(row=7, column=0, padx=20,pady = (5,5),sticky="news")
+
+        app.grip_current_slider = customtkinter.CTkSlider(app.Gripper_frame,from_ = 100, to = 1000,number_of_steps=900)
+        app.grip_current_slider.set(180)
+        app.grip_current_slider.grid(row=7, column=1,columnspan=1, padx=(0, 10), pady=(5, 5), sticky="news")
+
+        app.grip_current_percent = customtkinter.CTkLabel(app.Gripper_frame,text="100%", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
+        app.grip_current_percent.grid(row=7, column=2, padx=5,pady = (5,5),sticky="news")
+
+        app.grip_current_entry = customtkinter.CTkEntry(app.Gripper_frame, width= 150)
+        app.grip_current_entry.grid(row= 7, column=3, padx=(0, 0),pady=(3,3),sticky="E")
+
+        app.grip_current_set = customtkinter.CTkButton(app.Gripper_frame,text="Current setpoint", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Set_gripper_cur)
+        app.grip_current_set.grid(row=7, column=0, padx=20,pady = (3,3),sticky="news")  
+
+        app.grip_set = customtkinter.CTkButton(app.Gripper_frame,text="Move GoTo", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Gripper_set_values)
+        app.grip_set.grid(row=8, column=0, padx=20,pady = (3,3),sticky="news")  
+        app.change_ID = customtkinter.CTkButton(app.Gripper_frame,text="Change gripper ID", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Change_gripper_ID)
+        app.change_ID.grid(row=8, column=1, padx=20,pady = (3,3),sticky="news") 
+        app.grip_ID_entry = customtkinter.CTkEntry(app.Gripper_frame, width= 150)
+        app.grip_ID_entry.grid(row= 8, column=2, padx=(0, 0),pady=(3,3),sticky="E")
+
+
+        # Feedback
+
+        app.grip_empty = customtkinter.CTkLabel(app.Gripper_frame,text="", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
+        app.grip_empty.grid(row=9, column=0, padx=20,pady = (5,5),sticky="news")
+
+        app.grip_feedback = customtkinter.CTkLabel(app.Gripper_frame,text="Gripper feedback", font = customtkinter.CTkFont(size=18, family='TkDefaultFont'))
+        app.grip_feedback.grid(row=10, column=0, padx=20,pady = (5,5),sticky="news")
+
+        app.grip_feedback_pos = customtkinter.CTkLabel(app.Gripper_frame, text="Gripper position feedback is: " + str(Gripper_data_in[1]), font=customtkinter.CTkFont(size=text_size))
+        app.grip_feedback_pos.grid(row=11, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_feedback_current = customtkinter.CTkLabel(app.Gripper_frame, text="Gripper current feedback is: " + str(Gripper_data_in[3]), font=customtkinter.CTkFont(size=text_size))
+        app.grip_feedback_current.grid(row=12, column=0, padx=20,pady = (10,20),sticky="news")
+    
+        app.grip_object_detection = customtkinter.CTkLabel(app.Gripper_frame, text="Gripper detected " + str(Gripper_data_in[4]), font=customtkinter.CTkFont(size=text_size))
+        app.grip_object_detection.grid(row=13, column=0, padx=20,pady = (10,20),sticky="news")
+
+        app.grip_object_size = customtkinter.CTkLabel(app.Gripper_frame, text="Detected object size is:  " , font=customtkinter.CTkFont(size=text_size))
+        app.grip_object_size.grid(row=14, column=0, padx=20,pady = (10,20),sticky="news")
 
 
     def demo_start():
@@ -849,8 +962,9 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         Input_var_ = app.table.insert(parent = '', index ='end',iid = 8,text="Parent",values="Input")
         Output_var_ = app.table.insert(parent = '', index ='end',iid = 9,text="Parent",values="Output")
         Gripper = app.table.insert(parent = '', index ='end',iid = 10,text="Parent",values="Gripper")
-        Get_data = app.table.insert(parent = '', index ='end',iid = 11,text="Parent",values="Get_data")
-        Timeouts = app.table.insert(parent = '', index ='end',iid = 12,text="Parent",values="Timeouts")
+        Gripper_cal = app.table.insert(parent = '', index ='end',iid = 11,text="Parent",values="Gripper_cal")
+        Get_data = app.table.insert(parent = '', index ='end',iid = 12,text="Parent",values="Get_data")
+        Timeouts = app.table.insert(parent = '', index ='end',iid = 13,text="Parent",values="Timeouts")
 
         # Joint space commands
         v1 = app.table.insert(Joint_space, index ='end',iid = 100,open = True, text="Child",values="MoveJoint")
@@ -899,6 +1013,48 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
 
         app.table.bind('<ButtonRelease-1>', select)
 
+
+    def Change_gripper_ID():
+        ID_var = app.grip_ID_entry.get()
+        if(int(ID_var) > 16 ):
+            None
+        else:
+            Gripper_data_out[5] = int(ID_var)
+
+    def Set_gripper_pos():
+        pos_value = app.grip_pos_entry.get()
+        if(pos_value != ""):
+            if(int(pos_value) >= 0 and int(pos_value)<= 255):
+                print(pos_value)
+                app.grip_pos_slider.set(int(pos_value))
+                #Gripper_data_out[4] = 0
+
+    def Set_gripper_vel():
+        
+        vel_value = app.grip_speed_entry.get()
+        if(vel_value != ""):
+            if(int(vel_value) >= 0 and int(vel_value)<= 255):
+                print(vel_value)
+                app.grip_speed_slider.set(int(vel_value))
+
+    def Set_gripper_cur():
+        cur_value = app.grip_current_entry.get()
+        if(cur_value != ""):
+            if(int(cur_value) >= 0 and int(cur_value)<= 1000):
+                print(cur_value)
+                app.grip_current_slider.set(int(cur_value))
+
+    def Gripper_set_values():
+        Gripper_data_out[0] = int(app.grip_pos_slider.get())
+        Gripper_data_out[1] = int(app.grip_speed_slider.get())
+        Gripper_data_out[2] = int(app.grip_current_slider.get())
+
+
+    def Gripper_calibrate():
+        Gripper_data_out[4] = 1
+
+    def Gripper_clear_error():
+        Gripper_data_out[4] = 2
 
     def Set_output_1(state):
         logging.debug("Output 1 state is: ")
@@ -1070,6 +1226,18 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
             Buttons[4] = 1
         logging.debug(Real_robot)
 
+
+    def Select_gripper_activate():
+        global Gripper_activate_deactivate
+        Gripper_activate_deactivate  = not Gripper_activate_deactivate
+        if(Gripper_activate_deactivate == 0):
+            app.grip_activate_radio.deselect()
+            #Buttons[4] = 0
+        else:
+            app.grip_activate_radio.select()
+            #Buttons[4] = 1
+        logging.debug(Gripper_activate_deactivate)
+
     def quick_gripper_button():
         global Quick_grip
         Quick_grip = not Quick_grip
@@ -1096,6 +1264,12 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     def raise_calibrate_frame():
         app.Calibrate_frame.tkraise()
         current_menu = "Calibrate"
+        logging.debug(current_menu)
+
+
+    def raise_gripper_frame():
+        app.Gripper_frame.tkraise()
+        current_menu = "Gripper"
         logging.debug(current_menu)
 
     def show_warrning():
@@ -1302,6 +1476,44 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.Velocity_percent.configure(text= ""+ str(v1).rjust(4, ' ')+ "%")
         app.Accel_percent.configure(text= "" + str(v2).rjust(4, ' ') + "%")
 
+        # Gripper stuff
+        # Sliders
+        gpos = app.grip_pos_slider.get()
+        #Gripper_data_out[0] = int(gpos)
+        app.grip_pos_percent.configure(text= ""+ str(gpos))
+
+        gvel = app.grip_speed_slider.get()
+        #Gripper_data_out[1] = int(gvel)
+        app.grip_speed_percent.configure(text= ""+ str(gvel))
+
+        gcur = app.grip_current_slider.get()
+        #Gripper_data_out[2] = int(gcur)
+        app.grip_current_percent.configure(text= "" + str(gcur).rjust(0, ' ') + " mA")
+
+        app.grip_feedback_pos.configure(text="Gripper position feedback is: " + str(round(Gripper_data_in[1],0)).rjust(7, ' '))
+        app.grip_feedback_current.configure(text="Gripper current feedback is: " + str(round(Gripper_data_in[3],0)).rjust(7, ' '))
+        app.grip_object_detection.configure(text="Gripper object detection is: " + str(round(Gripper_data_in[4],0)).rjust(7, ' '))
+       
+        #bitfield_list = [Gripper_activate_deactivate,Gripper_action_status,InOut_in[4],Gripper_rel_dir,0,0,0,0] #InOut_in[4] is estop
+        bitfield_list = [Gripper_activate_deactivate,Gripper_action_status,not InOut_in[4],Gripper_rel_dir,0,0,0,0] #InOut_in[4] is estop
+        fused = PAROL6_ROBOT.fuse_bitfield_2_bytearray(bitfield_list)
+        Gripper_data_out[3] = int(fused.hex(),16)
+
+        Gripper_data_byte = PAROL6_ROBOT.split_2_bitfield(Gripper_data_in[4]) 
+        fused_number = (Gripper_data_byte[2] << 1) | Gripper_data_byte[3]
+        if(fused_number == 0):
+            app.grip_object_detection.configure(text="Gripper in motion ")
+        elif(fused_number == 1):
+            app.grip_object_detection.configure(text="Object detected when closing ")
+        elif(fused_number == 2):
+            app.grip_object_detection.configure(text="Object detected when opening ")
+        elif(fused_number == 3):
+            app.grip_object_detection.configure(text="Gripper is at position ")
+
+        app.grip_cal_status.configure(text="Calibration status is: " + str(Gripper_data_byte[7]).rjust(7, ' '))
+        app.Error_status_grip.configure(text="Error status is: " + str(Gripper_data_byte[6]).rjust(7, ' '))
+        app.Gripper_ID.configure(text="Gripper ID is: " + str(Gripper_data_out[5]))
+
         highlight_words_response(None)
         highlight_words_program(None)
         # If tab is joint jog
@@ -1327,6 +1539,7 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     IO_frame()
     start_stop_frame()
     Calibrate_frame()
+    Gripper_frame()
     app.jog_frame.tkraise()
 
     Stuff_To_Update()
@@ -1350,8 +1563,12 @@ if __name__ == "__main__":
     Affected_joint_out = [1,1,1,1,1,1,1,1]
     InOut_out = [1,1,1,1,1,1,1,1]
     Timeout_out = 123
-    #Positon,speed,current,command,mode,ID
-    Gripper_data_out = [1,1,1,1,1,1]
+
+    # Data we send to the gripper!
+    # Positon,speed,current,command,mode,ID
+    # We use Positon,speed,current,command, mode(used for sending calibration)
+    # Command is 8 bits fused
+    Gripper_data_out = [1,1,1,1,1,0]
 
     # Data sent from robot to PC
     Position_in = [31,32,33,34,35,36]
@@ -1365,7 +1582,9 @@ if __name__ == "__main__":
     Timing_data_in = 123
     XTR_data =   123
 
+    # Data we get from the gripper
     #ID,Position,speed,current,status,obj_detection
+    # From this data we will use: position, current, status 
     Gripper_data_in = [110,120,130,140,150,160]
 
     # GUI control data
