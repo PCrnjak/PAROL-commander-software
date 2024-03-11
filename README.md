@@ -9,7 +9,7 @@ To use commander software your PC needs to meet some [minimal hardware specs!](h
 
 Robot arm building instructions, STL files, BOM can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
 
-To run this code you need to use PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
+To run this code you need to use the PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
 
 PAROL6 commander software is a tool for controlling and programming the PAROL6 robotic arm!
 Some of the features are: <br />
@@ -22,6 +22,7 @@ Some of the features are: <br />
 * Built-in simulator
 * Programming interface with simple-to-use commands
 * Real-time control of robot outputs and reading of inputs
+* Built-in control for [SSG-48 adaptive electric gripper](https://source-robotics.com/products/compliant-gripper)
 
 # What is PAROL6 robotic arm?
 
@@ -39,12 +40,12 @@ Tested on python 3.10.12 <br />
 **Manual**<br />
 How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)<br />
 How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
-<br /> **Also works on MAC, just follow linux install guide.
+<br /> **Also works on MAC, just follow the Linux install guide.
 
 **Using requirements.txt**<br />
 pip install -r requirements.txt
 
-For linux you will also have to:<br />
+For Linux you will also have to:<br />
 sudo apt-get install python3-tk<br />
 sudo apt-get install python3-pil python3-pil.imagetk<br />
 
@@ -73,9 +74,9 @@ General features:
   - ROS2 support
   - Moveit example
   - ROBODK postprocessor
-  - TODO -> Stepper driver stages need to go to short or all fets low when power button is pressed
+  - TODO -> Stepper driver stages need to go to short or all fets low when the power button is pressed
   - TODO ->Implement Swift simulator - https://github.com/jhavl/swift
-  - TODO -> Create executable files for windows and linux
+  - TODO -> Create executable files for windows and Linux
 
   PAROL6 commander software features:
   - Reading GCODE commands
