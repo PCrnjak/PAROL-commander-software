@@ -1485,7 +1485,7 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         gvel = app.grip_speed_slider.get()
         #Gripper_data_out[1] = int(gvel)
         app.grip_speed_percent.configure(text= ""+ str(gvel))
-
+        
         gcur = app.grip_current_slider.get()
         #Gripper_data_out[2] = int(gcur)
         app.grip_current_percent.configure(text= "" + str(gcur).rjust(0, ' ') + " mA")
