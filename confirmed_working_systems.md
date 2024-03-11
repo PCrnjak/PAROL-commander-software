@@ -12,4 +12,7 @@
     Radxa ROCK 5B 
     Linux
     ////////////////////////////////////
+    MacBook Pro
+    Processor: 2.6 Ghz 6-core intel core i7
+    macOS: Sonoma 14.3.1
     
