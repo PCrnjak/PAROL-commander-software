@@ -39,6 +39,7 @@ Tested on python 3.10.12 <br />
 **Manual**<br />
 How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)<br />
 How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
+<br /> **Also works on MAC, just follow linux install guide.
 
 **Using requirements.txt**<br />
 pip install -r requirements.txt
