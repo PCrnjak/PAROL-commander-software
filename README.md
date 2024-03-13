@@ -1,5 +1,5 @@
 # PAROL-commander-software
-[![License: MIT](https://img.shields.io/badge/license-GPLv3-blue)](https://opensource.org/license/gpl-3-0/)
+[![License: MIT](https://img.shields.io/badge/license-GPLv3-blue)](https://opensource.org/license/gpl-3-0/)  ![Issues](https://img.shields.io/github/issues/PCrnjak/PAROL-commander-software) ![release](https://img.shields.io/github/v/release/PCrnjak/PAROL-commander-software)
 
 <img src="Images/screen_2.png" alt="drawing" width="700"/>
 
