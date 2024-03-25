@@ -62,7 +62,7 @@ How to use PAROL commander software can be found in [DOCS](https://source-roboti
 Join [Discord](https://discord.com/invite/prjUvjmGpZ ) community!
 - [Youtube](https://www.youtube.com/channel/UCp3sDRwVkbm7b2M-2qwf5aQ)
 - [Hackaday](https://hackaday.io/project/167247-faze4-robotic-arm)
-- [Instagram](https://www.instagram.com/5arcrnjak/)
+- [Instagram](https://www.instagram.com/source_robotics/)
 - [DOCS](https://source-robotics.github.io/PAROL-docs/)
 
   
