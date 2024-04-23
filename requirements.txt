@@ -20,7 +20,6 @@ pyserial==3.5
 python-dateutil==2.8.2
 roboticstoolbox-python==1.0.3
 rtb-data==1.0.1
-s-visual-kinematics==0.2.1
 scipy==1.11.4
 six==1.16.0
 spatialgeometry==1.0.3
