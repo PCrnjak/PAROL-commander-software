@@ -42,7 +42,7 @@ logging.basicConfig(level = logging.DEBUG,
 )
 
 if my_os == "Windows": 
-    STARTING_PORT = 8 # COM3
+    STARTING_PORT = 58 # COM3
 else:   
     STARTING_PORT = 0
 # if using linux this will add /dev/ttyACM + 0 ---> /dev/ttyACM0
