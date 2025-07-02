@@ -24,6 +24,34 @@ from spatialmath.base.argcheck import (
     getvector,
     isscalar,
 )
+def normalize_angle(angle):
+    """Normalize angle to [-pi, pi] range to handle angle wrapping"""
+    while angle > np.pi:
+        angle -= 2 * np.pi
+    while angle < -np.pi:
+        angle += 2 * np.pi
+    return angle
+
+def unwrap_angles(q_solution, q_current):
+    """
+    Unwrap angles in the solution to be closest to current position.
+    This handles the angle wrapping issue where -179° and 181° are close but appear far.
+    """
+    q_unwrapped = q_solution.copy()
+    
+    for i in range(len(q_solution)):
+        # Calculate the difference
+        diff = q_solution[i] - q_current[i]
+        
+        # If the difference is more than pi, we need to unwrap
+        if diff > np.pi:
+            # Solution is too far in positive direction, subtract 2*pi
+            q_unwrapped[i] = q_solution[i] - 2 * np.pi
+        elif diff < -np.pi:
+            # Solution is too far in negative direction, add 2*pi
+            q_unwrapped[i] = q_solution[i] + 2 * np.pi
+    
+    return q_unwrapped
 
 
 
@@ -31,6 +59,9 @@ my_os = platform.system()
 if my_os == "Windows":
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Windows")
+elif my_os == "Darwin":
+    Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+    logging.debug("Os is Mac")
 else: 
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Linux")
@@ -43,10 +74,13 @@ logging.basicConfig(level = logging.DEBUG,
 
 if my_os == "Windows": 
     STARTING_PORT = 58 # COM3
+elif my_os == "Darwin":
+    STARTING_PORT = 0 # Mac uses different port naming
 else:   
     STARTING_PORT = 0
 # if using linux this will add /dev/ttyACM + 0 ---> /dev/ttyACM0
 # if using windows this will add COM + 3 ---> COM3 
+# if using mac this will add /dev/tty.usbmodem + 0 ---> /dev/tty.usbmodem0 (placeholder)
 str_port = ''
 logging.disable(logging.DEBUG)
 if my_os == "Windows":
@@ -61,6 +95,16 @@ elif my_os == "Linux":
         ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
     except:
         ser = serial.Serial()
+elif my_os == "Darwin":
+    try:
+        # Mac users will need to set the correct port in the GUI
+        # Common Mac serial port patterns: /dev/tty.usbmodem*, /dev/tty.usbserial*
+        str_port = '/dev/tty.usbmodem' + str(STARTING_PORT)
+        ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
+    except:
+        ser = serial.Serial()
+else:
+    ser = serial.Serial()
 #ser.open()
 
 # in big endian machines, first byte of binary representation of the multibyte data-type is stored first. 
@@ -1419,15 +1463,27 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             elif Command_step != Command_len : #
 
                                 if ik_error == 0:
-                                    # Calculate joint positons from matrix crated by ctraj
-                                    temp[Command_step] = PAROL6_ROBOT.robot.ikine_LMS(Ctraj_traj[Command_step],q0 = joint_positions[Command_step-1], ilimit = 60)
-                                    joint_positions[Command_step] = temp[Command_step][0]
-                                    #print("results")
-                                    #print(temp[Command_step])
-                                    #print(temp[Command_step].success)
-                                    if str(temp[Command_step].success) == 'False':
-                                        print("i am false")
-                                        shared_string.value = b'Error: MoveCart() IK error'
+                                    # Use standard IK solver
+                                    try:
+                                        ik_result = PAROL6_ROBOT.robot.ikine_LMS(
+                                            Ctraj_traj[Command_step], 
+                                            q0=joint_positions[Command_step-1], 
+                                            ilimit=100
+                                        )
+                                        
+                                        if ik_result.success:
+                                            # Unwrap angles to handle angle wrapping
+                                            q_solution = unwrap_angles(ik_result.q, joint_positions[Command_step-1])
+                                            joint_positions[Command_step] = q_solution
+                                        else:
+                                            print("IK failed")
+                                            shared_string.value = b'Error: MoveCart() - IK solution not found'
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            ik_error = 1
+                                    except Exception as e:
+                                        print("IK error:", str(e))
+                                        shared_string.value = b'Error: MoveCart() - IK calculation failed'
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
@@ -1457,25 +1513,29 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     # Check if positons are in valid range
 
 
-                                    threshold_value_flip = 0.7
-                                    zero_threshold = 0.0001
-                                    # check if robot switches configurations by going from positive to negative angle!
-                                
+                                    # Improved configuration flip detection using angle normalization
+                                    threshold_value_flip = 1.5  # Increased threshold for real configuration changes
+                                    
                                     for i in range(6):
-                                        # if values are close to zero they flactuate a lot 
-                                        if abs(joint_positions[Command_step][i]) <= zero_threshold and abs(joint_positions[Command_step-1][i]) <= zero_threshold:
-                                            None
-                                        # Check if the absolute difference between the absolute values of 'a' and 'b' is less than or equal to the threshold
-                                        else:
-                                            if abs(abs(joint_positions[Command_step][i]) - abs( joint_positions[Command_step-1][i])) <= threshold_value_flip:
-                                                # Check if 'a' and 'b' have opposite signs
-                                                if (joint_positions[Command_step][i] > 0 and joint_positions[Command_step-1][i] < 0) or (joint_positions[Command_step][i] < 0 and joint_positions[Command_step-1][i] > 0):
-                                                    shared_string.value = b'Error: MoveCart() sign of position flipped'
-                                                    print("ik flip error in joint:", i)
-                                                    error_state = 1
-                                                    Buttons[7] = 0
-                                                    Speed_out[i] = 0
-                                                    Command_out.value = 255
+                                        # Normalize angles to [-pi, pi] range to handle angle wrapping
+                                        curr_angle = normalize_angle(joint_positions[Command_step][i])
+                                        prev_angle = normalize_angle(joint_positions[Command_step-1][i])
+                                        
+                                        # Calculate the actual angular difference
+                                        angle_diff = abs(curr_angle - prev_angle)
+                                        
+                                        # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
+                                        if angle_diff > np.pi:
+                                            angle_diff = 2 * np.pi - angle_diff
+                                        
+                                        # Only flag if there's a real large movement (not angle wrapping)
+                                        if angle_diff > threshold_value_flip:
+                                            shared_string.value = b'Error: MoveCart() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
+                                            print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            Speed_out[i] = 0
+                                            Command_out.value = 255
     	                            
 
                                     Command_step = Command_step + 1
@@ -1674,15 +1734,27 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             elif Command_step != Command_len : #
 
                                 if ik_error == 0:
-                                    # Calculate joint positons from matrix crated by ctraj
-                                    temp[Command_step] = PAROL6_ROBOT.robot.ikine_LMS(Ctraj_traj[Command_step],q0 = joint_positions[Command_step-1], ilimit = 60)
-                                    joint_positions[Command_step] = temp[Command_step][0]
-                                    #print("results")
-                                    #print(temp[Command_step])
-                                    #print(temp[Command_step].success)
-                                    if str(temp[Command_step].success) == 'False':
-                                        print("i am false")
-                                        shared_string.value = b'Error: MoveCartRelTRF() IK error'
+                                    # Use standard IK solver
+                                    try:
+                                        ik_result = PAROL6_ROBOT.robot.ikine_LMS(
+                                            Ctraj_traj[Command_step], 
+                                            q0=joint_positions[Command_step-1], 
+                                            ilimit=100
+                                        )
+                                        
+                                        if ik_result.success:
+                                            # Unwrap angles to handle angle wrapping
+                                            q_solution = unwrap_angles(ik_result.q, joint_positions[Command_step-1])
+                                            joint_positions[Command_step] = q_solution
+                                        else:
+                                            print("IK failed")
+                                            shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found'
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            ik_error = 1
+                                    except Exception as e:
+                                        print("IK error:", str(e))
+                                        shared_string.value = b'Error: MoveCartRelTRF() - IK calculation failed'
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
@@ -1712,25 +1784,29 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     # Check if positons are in valid range
 
 
-                                    threshold_value_flip = 0.7
-                                    zero_threshold = 0.0001
-                                    # check if robot switches configurations by going from positive to negative angle!
-                                
+                                    # Improved configuration flip detection using angle normalization
+                                    threshold_value_flip = 1.5  # Increased threshold for real configuration changes
+                                    
                                     for i in range(6):
-                                        # if values are close to zero they flactuate a lot 
-                                        if abs(joint_positions[Command_step][i]) <= zero_threshold and abs(joint_positions[Command_step-1][i]) <= zero_threshold:
-                                            None
-                                        # Check if the absolute difference between the absolute values of 'a' and 'b' is less than or equal to the threshold
-                                        else:
-                                            if abs(abs(joint_positions[Command_step][i]) - abs( joint_positions[Command_step-1][i])) <= threshold_value_flip:
-                                                # Check if 'a' and 'b' have opposite signs
-                                                if (joint_positions[Command_step][i] > 0 and joint_positions[Command_step-1][i] < 0) or (joint_positions[Command_step][i] < 0 and joint_positions[Command_step-1][i] > 0):
-                                                    shared_string.value = b'Error: MoveCartRelTRF() sign of position flipped'
-                                                    print("ik flip error in joint:", i)
-                                                    error_state = 1
-                                                    Buttons[7] = 0
-                                                    Speed_out[i] = 0
-                                                    Command_out.value = 255
+                                        # Normalize angles to [-pi, pi] range to handle angle wrapping
+                                        curr_angle = normalize_angle(joint_positions[Command_step][i])
+                                        prev_angle = normalize_angle(joint_positions[Command_step-1][i])
+                                        
+                                        # Calculate the actual angular difference
+                                        angle_diff = abs(curr_angle - prev_angle)
+                                        
+                                        # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
+                                        if angle_diff > np.pi:
+                                            angle_diff = 2 * np.pi - angle_diff
+                                        
+                                        # Only flag if there's a real large movement (not angle wrapping)
+                                        if angle_diff > threshold_value_flip:
+                                            shared_string.value = b'Error: MoveCartRelTRF() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
+                                            print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            Speed_out[i] = 0
+                                            Command_out.value = 255
     	                            
 
                                     Command_step = Command_step + 1
@@ -1844,6 +1920,18 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                     com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
+                elif my_os == 'Darwin':
+                    # For Mac, check if full path mode is enabled
+                    if General_data[0] == -1:
+                        # Use full path from shared_string
+                        com_port = shared_string.value.decode('utf-8')
+                        # Fallback to default if shared_string is empty
+                        if not com_port or com_port.isspace():
+                            com_port = '/dev/tty.usbmodem0'
+                    elif General_data[0] == 0:
+                        com_port = '/dev/tty.usbmodem0'  # Default placeholder
+                    else:
+                        com_port = '/dev/tty.usbmodem' + str(General_data[0])
                     
                 print(com_port)
                 ser.port = com_port
@@ -1854,7 +1942,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 time.sleep(0.5)
             except:
                 time.sleep(0.5)
-                logging.debug("no serial available, reconnecting!")   
+                logging.debug("no serial available, reconnecting!")
 
         timer.checkpt()
 
@@ -1914,6 +2002,18 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
                     com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
+                elif my_os == 'Darwin':
+                    # For Mac, check if full path mode is enabled
+                    if General_data[0] == -1:
+                        # Use full path from shared_string
+                        com_port = shared_string.value.decode('utf-8')
+                        # Fallback to default if shared_string is empty
+                        if not com_port or com_port.isspace():
+                            com_port = '/dev/tty.usbmodem0'
+                    elif General_data[0] == 0:
+                        com_port = '/dev/tty.usbmodem0'  # Default placeholder
+                    else:
+                        com_port = '/dev/tty.usbmodem' + str(General_data[0])
                     
                 
                 print(com_port)
@@ -1925,7 +2025,7 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
                 time.sleep(0.5)
             except:
                 time.sleep(0.5)
-                logging.debug("no serial available, reconnecting!")                    
+                logging.debug("no serial available, reconnecting!")
         #Get_data_old()
         #print("Task 2 alive")
         #time.sleep(2)
@@ -2689,8 +2789,8 @@ if __name__ == '__main__':
     # Speed slider, acc slider, WRF/TRF 
     Jog_control = multiprocessing.Array("i",[0,0,0,0], lock=False) 
 
-    # COM PORT, BAUD RATE, 
-    General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000], lock=False) 
+    # COM PORT, BAUD RATE, additional space for macOS full path flag
+    General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000,0], lock=False)
 
     # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,
     Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0,0], lock=False) 
