@@ -393,19 +393,22 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 var = PAROL6_ROBOT.robot.ikine_LMS(T,q0 = q1, ilimit = 6) # Get joint angles
 
                 temp_var = [0,0,0,0,0,0]
-                for i in range(6):
-
-                    temp_var[i] = ((var[0][i] - q1[i]) / INTERVAL_S)
-                    #print(temp_var)
-
-                    # If solver gives error DISABLE ROBOT
-                    if var.success:
+                
+                # If solver gives error DISABLE ROBOT
+                if var.success:
+                    # Unwrap angles to handle angle wrapping
+                    unwrapped_solution = unwrap_angles(var.q, q1)
+                    
+                    for i in range(6):
+                        temp_var[i] = ((unwrapped_solution[i] - q1[i]) / INTERVAL_S)
+                        #print(temp_var)
                         Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(temp_var[i],i))
                         prev_speed[i] = Speed_out[i]
-                    else:
-                        shared_string.value = b'Error: Inverse kinematics error '
-                        #Command_out.value = 102
-                        #Speed_out[i] = 0
+                else:
+                    shared_string.value = b'Error: Inverse kinematics error '
+                    #Command_out.value = 102
+                    for i in range(6):
+                        Speed_out[i] = 0
                     # If any joint passed its position limit, disable robot
 
 
@@ -1488,68 +1491,71 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                         Buttons[7] = 0
                                         ik_error = 1
                                         
-                                    # Check if positons are in valid range
+                                    # Only continue with velocity calculation if IK was successful
+                                    if ik_error == 0:
+                                        # Calculate needed speed
+                                        for i in range(6):
+                                            
+                                            velocity_array[i] = (joint_positions[Command_step][i]  - joint_positions[Command_step-1][i] ) / INTERVAL_S 
 
-                                    # Calculate needed speed
-                                    for i in range(6):
+
+                                        # Set speeds and positions
+                                        for i in range(6):
+                                            # Ensure we convert numpy arrays/floats to Python scalars before int conversion
+                                            pos_val = float(joint_positions[Command_step][i])
+                                            vel_val = float(velocity_array[i])
+                                            
+                                            Position_out[i] = int(PAROL6_ROBOT.RAD2STEPS(pos_val, i))
+                                            Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(vel_val, i))
                                         
-                                        velocity_array[i] = (joint_positions[Command_step][i]  - joint_positions[Command_step-1][i] ) / INTERVAL_S 
-
-
-                                    # Set speeds and positions
-                                    for i in range(6):
-
-                                        Position_out[i] = (int(PAROL6_ROBOT.RAD2STEPS(joint_positions[Command_step][i],i)))
-                                        Speed_out[i] =  int(PAROL6_ROBOT.SPEED_RAD2STEP(velocity_array[i]  ,i)) 
-                                        
-                                    #print("joint positons are:", joint_positions[Command_step])
-                                    if tracking == None:
-                                        Command_out.value = 156
-                                    elif tracking == "speed":
-                                        Command_out.value = 123
-                                    else:
-                                        Command_out.value = 255
-                                    
-                                    # Check if positons are in valid range
-
-
-                                    # Improved configuration flip detection using angle normalization
-                                    threshold_value_flip = 1.5  # Increased threshold for real configuration changes
-                                    
-                                    for i in range(6):
-                                        # Normalize angles to [-pi, pi] range to handle angle wrapping
-                                        curr_angle = normalize_angle(joint_positions[Command_step][i])
-                                        prev_angle = normalize_angle(joint_positions[Command_step-1][i])
-                                        
-                                        # Calculate the actual angular difference
-                                        angle_diff = abs(curr_angle - prev_angle)
-                                        
-                                        # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
-                                        if angle_diff > np.pi:
-                                            angle_diff = 2 * np.pi - angle_diff
-                                        
-                                        # Only flag if there's a real large movement (not angle wrapping)
-                                        if angle_diff > threshold_value_flip:
-                                            shared_string.value = b'Error: MoveCart() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
-                                            print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
-                                            error_state = 1
-                                            Buttons[7] = 0
-                                            Speed_out[i] = 0
+                                        #print("joint positons are:", joint_positions[Command_step])
+                                        if tracking == None:
+                                            Command_out.value = 156
+                                        elif tracking == "speed":
+                                            Command_out.value = 123
+                                        else:
                                             Command_out.value = 255
-    	                            
+                                        
+                                        # Check if positons are in valid range
 
-                                    Command_step = Command_step + 1
 
-                                    # check the speeds
-                                    
-                                    for i in range(6):
-                                        if  abs(Speed_out[i] > PAROL6_ROBOT.Joint_max_speed[i]):
-                                            shared_string.value = b'Error: MoveCart() speed is too big'
-                                            print("error in joint:", i)
-                                            error_state = 1
-                                            Buttons[7] = 0
-                                            Speed_out[i] = 0
-                                            Command_out.value = 255
+                                        # Improved configuration flip detection using angle normalization
+                                        threshold_value_flip = 1.5  # Increased threshold for real configuration changes
+                                        
+                                        for i in range(6):
+                                            # Normalize angles to [-pi, pi] range to handle angle wrapping
+                                            curr_angle = normalize_angle(joint_positions[Command_step][i])
+                                            prev_angle = normalize_angle(joint_positions[Command_step-1][i])
+                                            
+                                            # Calculate the actual angular difference
+                                            angle_diff = abs(curr_angle - prev_angle)
+                                            
+                                            # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
+                                            if angle_diff > np.pi:
+                                                angle_diff = 2 * np.pi - angle_diff
+                                            
+                                            # Only flag if there's a real large movement (not angle wrapping)
+                                            if angle_diff > threshold_value_flip:
+                                                shared_string.value = b'Error: MoveCart() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
+                                                print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
+                                                error_state = 1
+                                                Buttons[7] = 0
+                                                Speed_out[i] = 0
+                                                Command_out.value = 255
+        	                            
+
+                                        Command_step = Command_step + 1
+
+                                        # check the speeds
+                                        
+                                        for i in range(6):
+                                            if  abs(Speed_out[i] > PAROL6_ROBOT.Joint_max_speed[i]):
+                                                shared_string.value = b'Error: MoveCart() speed is too big'
+                                                print("error in joint:", i)
+                                                error_state = 1
+                                                Buttons[7] = 0
+                                                Speed_out[i] = 0
+                                                Command_out.value = 255
                                     
 
                                 else: 
@@ -2827,8 +2833,3 @@ if __name__ == '__main__':
     process1.terminate()
     process2.terminate()
     process3.terminate()
-
-
-
-
-
