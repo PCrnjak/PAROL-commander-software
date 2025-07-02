@@ -1,12 +1,19 @@
 import tkinter
 import tkinter.messagebox
 import customtkinter
+import platform
+import os
+
+# macOS-specific matplotlib backend configuration
+my_os = platform.system()
+if my_os == "Darwin":  # macOS
+    import matplotlib
+    matplotlib.use('TkAgg')  # Use TkAgg backend for better macOS compatibility
+    
 import matplotlib.pyplot as plt
 import time
 import roboticstoolbox as rp
 import numpy as np
-import platform
-import os
 import PIL
 from PIL import Image, ImageTk
 import logging
@@ -29,10 +36,12 @@ logging.basicConfig(level = logging.DEBUG,
 
 
 # Finds out where the program and images are stored
-my_os = platform.system()
 if my_os == "Windows":
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Windows")
+elif my_os == "Darwin":
+    Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+    logging.debug("Os is Mac")
 else:
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Linux")
@@ -94,13 +103,28 @@ def GUI(Position_out,Position_in,Position_Sim,Buttons):
     f = robot.forward(theta)
 
     app = customtkinter.CTk()
-    app.lift()
-    app.attributes('-topmost',True)
-    logging.debug("I RUN")
+    
+    # macOS-specific window configuration
+    if my_os == "Darwin":
+        try:
+            # Don't use topmost on macOS initially to avoid conflicts
+            app.title("Simulator.py")
+            app.geometry(f"{750}x{680}")
+            # Bring to front but don't force topmost
+            app.lift()
+            app.focus_force()
+        except Exception as e:
+            logging.warning(f"macOS window setup warning: {e}")
+            app.title("Simulator.py")
+            app.geometry(f"{750}x{680}")
+    else:
+        app.lift()
+        app.attributes('-topmost',True)
+        logging.debug("I RUN")
         # configure window
-    app.title("Simulator.py")
-    app.geometry(f"{750}x{680}")
-    app.wm_attributes('-topmost',False)
+        app.title("Simulator.py")
+        app.geometry(f"{750}x{680}")
+        app.wm_attributes('-topmost',False)
 
     # Add app icon
     if my_os == "Windows":
