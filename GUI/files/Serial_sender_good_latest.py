@@ -10,13 +10,14 @@ import GUI_PAROL_latest
 import SIMULATOR_Robot
 import PAROL6_ROBOT 
 import numpy as np
-from spatialmath import *
+from spatialmath import SE3
+from spatialmath.base import trinterp
+from collections import namedtuple
 import platform
 import os
 import re
 import math
-from roboticstoolbox import trapezoidal
-from roboticstoolbox import quintic
+from roboticstoolbox import trapezoidal, DHRobot, quintic
 from spatialmath.base.argcheck import (
     isvector,
     getvector,
@@ -53,7 +54,65 @@ def unwrap_angles(q_solution, q_current):
     
     return q_unwrapped
 
+IKResult = namedtuple('IKResult', 'success q iterations residual')
 
+def solve_ik_with_subdivision(
+        robot: DHRobot,
+        target_pose: SE3,
+        current_q,
+        current_pose: SE3 | None = None,
+        max_depth: int = 8,
+        ilimit: int = 100,
+        tol: float = 1e-10,
+):
+    """
+    Recursively subdivide the motion until ikine_LMS converges on every segment.
+
+    Returns
+    -------
+    IKResult
+        success  - True/False
+        q_path   - (mxn) array of the full joint trajectory (start → goal)
+        iterations, residual  - aggregated diagnostics
+    """
+    if current_pose is None:
+        current_pose = robot.fkine(current_q)
+
+    # ── inner recursive solver ────────────────────────────────────────────
+    def _solve(Ta: SE3, Tb: SE3, q_seed, depth):
+        """Return (path_list, success_flag, iterations, residual)."""
+        res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol)
+        if res.success:
+            q_good = unwrap_angles(res.q, q_seed)      # << unwrap vs *previous*
+            return [q_good], True, res.iterations, res.residual
+
+        if depth >= max_depth:
+            return [], False, res.iterations, res.residual
+
+        # split the segment and recurse
+        Tc = SE3(trinterp(Ta.A, Tb.A, 0.5))            # mid-pose (screw interp)
+
+        left_path,  ok_L, it_L, r_L = _solve(Ta, Tc, q_seed, depth+1)
+        if not ok_L:
+            return [], False, it_L, r_L
+
+        q_mid = left_path[-1]                          # last solved joint set
+        right_path, ok_R, it_R, r_R = _solve(Tc, Tb, q_mid, depth+1)
+
+        return (
+            left_path + right_path,
+            ok_R,
+            it_L + it_R,
+            r_R
+        )
+
+    # ── kick-off ───────────────────────────────────────────────────────────
+    path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0)
+
+    if ok:
+        return IKResult(True, path[-1], its, resid)
+    else:
+        return IKResult(False, None, its, resid)
 
 my_os = platform.system()
 if my_os == "Windows":
@@ -390,7 +449,11 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             shared_string.value = b'Log: TRF X- Rotation '
                         
 
-                var = PAROL6_ROBOT.robot.ikine_LMS(T,q0 = q1, ilimit = 6) # Get joint angles
+                # Get current pose for subdivision if needed
+                current_pose = PAROL6_ROBOT.robot.fkine(q1)
+                
+                # Use subdivision-capable IK solver
+                var = solve_ik_with_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20)
 
                 temp_var = [0,0,0,0,0,0]
                 
@@ -405,7 +468,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                         Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(temp_var[i],i))
                         prev_speed[i] = Speed_out[i]
                 else:
-                    shared_string.value = b'Error: Inverse kinematics error '
+                    shared_string.value = b'Error: Inverse kinematics error - subdivision failed'
                     #Command_out.value = 102
                     for i in range(6):
                         Speed_out[i] = 0
@@ -1017,7 +1080,20 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     R3.t[1] =  numbers[1] / 1000  
                                     R3.t[2] = numbers[2] / 1000
 
-                                    q_pose_move = PAROL6_ROBOT.robot.ikine_LMS(R3,q0 = PAROL6_ROBOT.Joints_standby_position_radian,  ilimit = 60)
+                                    # Use subdivision-capable IK solver for the target pose
+                                    q_pose_move = solve_ik_with_subdivision(
+                                        PAROL6_ROBOT.robot, 
+                                        R3, 
+                                        initial_pos,  # Use current position instead of standby
+                                        ilimit=100
+                                    )
+                                    
+                                    if not q_pose_move.success:
+                                        shared_string.value = b'Error: MovePose() - Cannot reach target pose'
+                                        error_state = 1
+                                        Buttons[7] = 0
+                                        break
+                                    
                                     joint_angle_pose = np.array([q_pose_move.q[0],q_pose_move.q[1],q_pose_move.q[2],q_pose_move.q[3],q_pose_move.q[4],q_pose_move.q[5]])
 
                                     needed_pos = np.array([joint_angle_pose[0] + 0.0000001,
@@ -1474,11 +1550,19 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                                                       PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
                                                                       PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
                                     
-                                    # Use standard IK solver
+                                    # Use subdivision-capable IK solver
                                     try:
-                                        ik_result = PAROL6_ROBOT.robot.ikine_LMS(
+                                        # Get previous pose for better subdivision
+                                        if Command_step > 0:
+                                            prev_pose = Ctraj_traj[Command_step - 1]
+                                        else:
+                                            prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
+                                        
+                                        ik_result = solve_ik_with_subdivision(
+                                            PAROL6_ROBOT.robot,
                                             Ctraj_traj[Command_step], 
-                                            q0=current_robot_position, 
+                                            current_robot_position,
+                                            prev_pose,
                                             ilimit=100
                                         )
                                         
@@ -1487,14 +1571,14 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                             q_solution = unwrap_angles(ik_result.q, current_robot_position)
                                             joint_positions[Command_step] = q_solution
                                         else:
-                                            print("IK failed")
-                                            shared_string.value = b'Error: MoveCart() - IK solution not found'
+                                            print("IK failed even with subdivision")
+                                            shared_string.value = b'Error: MoveCart() - IK solution not found even with path subdivision'
                                             error_state = 1
                                             Buttons[7] = 0
                                             ik_error = 1
                                     except Exception as e:
                                         print("IK error:", str(e))
-                                        shared_string.value = b'Error: MoveCart() - IK calculation failed'
+                                        shared_string.value = b'Error: MoveCart() - IK calculation failed: ' + bytes(str(e)[:50], 'utf-8')
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
@@ -1756,11 +1840,19 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                                                       PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
                                                                       PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
                                     
-                                    # Use standard IK solver
+                                    # Use subdivision-capable IK solver
                                     try:
-                                        ik_result = PAROL6_ROBOT.robot.ikine_LMS(
+                                        # Get previous pose for better subdivision
+                                        if Command_step > 0:
+                                            prev_pose = Ctraj_traj[Command_step - 1]
+                                        else:
+                                            prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
+                                        
+                                        ik_result = solve_ik_with_subdivision(
+                                            PAROL6_ROBOT.robot,
                                             Ctraj_traj[Command_step], 
-                                            q0=current_robot_position, 
+                                            current_robot_position,
+                                            prev_pose,
                                             ilimit=100
                                         )
                                         
@@ -1769,14 +1861,14 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                             q_solution = unwrap_angles(ik_result.q, current_robot_position)
                                             joint_positions[Command_step] = q_solution
                                         else:
-                                            print("IK failed")
-                                            shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found'
+                                            print("IK failed even with subdivision")
+                                            shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found even with path subdivision'
                                             error_state = 1
                                             Buttons[7] = 0
                                             ik_error = 1
                                     except Exception as e:
                                         print("IK error:", str(e))
-                                        shared_string.value = b'Error: MoveCartRelTRF() - IK calculation failed'
+                                        shared_string.value = b'Error: MoveCartRelTRF() - IK calculation failed: ' + bytes(str(e)[:50], 'utf-8')
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
