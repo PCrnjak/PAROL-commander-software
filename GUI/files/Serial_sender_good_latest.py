@@ -1466,17 +1466,25 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             elif Command_step != Command_len : #
 
                                 if ik_error == 0:
+                                    # Use actual robot position as IK initial guess (same as cartesian jogging)
+                                    current_robot_position = np.array([PAROL6_ROBOT.STEPS2RADS(Position_in[0],0),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[1],1),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[2],2),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[3],3),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
+                                    
                                     # Use standard IK solver
                                     try:
                                         ik_result = PAROL6_ROBOT.robot.ikine_LMS(
                                             Ctraj_traj[Command_step], 
-                                            q0=joint_positions[Command_step-1], 
+                                            q0=current_robot_position, 
                                             ilimit=100
                                         )
                                         
                                         if ik_result.success:
-                                            # Unwrap angles to handle angle wrapping
-                                            q_solution = unwrap_angles(ik_result.q, joint_positions[Command_step-1])
+                                            # Unwrap angles to handle angle wrapping (use actual robot position)
+                                            q_solution = unwrap_angles(ik_result.q, current_robot_position)
                                             joint_positions[Command_step] = q_solution
                                         else:
                                             print("IK failed")
