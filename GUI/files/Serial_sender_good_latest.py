@@ -54,33 +54,98 @@ def unwrap_angles(q_solution, q_current):
     
     return q_unwrapped
 
-IKResult = namedtuple('IKResult', 'success q iterations residual')
+IKResult = namedtuple('IKResult', 'success q iterations residual tolerance_used')
 
-def solve_ik_with_subdivision(
+# Global variable to track previous tolerance for logging changes
+_prev_tolerance = None
+
+def calculate_adaptive_tolerance(robot, q, strict_tol=1e-10, loose_tol=1e-7):
+    """
+    Calculate adaptive tolerance based on proximity to singularities.
+    Near singularities: looser tolerance for easier convergence.
+    Away from singularities: stricter tolerance for precise solutions.
+    
+    Parameters
+    ----------
+    robot : DHRobot
+        Robot model
+    q : array_like
+        Joint configuration
+    strict_tol : float
+        Strict tolerance away from singularities (default: 1e-10)
+    loose_tol : float
+        Loose tolerance near singularities (1e-7)
+        
+    Returns
+    -------
+    float
+        Adaptive tolerance value
+    """
+    global _prev_tolerance
+    
+    q_array = np.array(q, dtype=float)
+    
+    # Calculate manipulability measure (closer to 0 = closer to singularity)
+    manip = robot.manipulability(q_array)
+    singularity_threshold = 0.001
+    
+    sing_normalized = np.clip(manip / singularity_threshold, 0.0, 1.0)
+    adaptive_tol = loose_tol + (strict_tol - loose_tol) * sing_normalized
+    
+    # Log tolerance changes (only log significant changes to avoid spam)
+    if _prev_tolerance is None or abs(adaptive_tol - _prev_tolerance) / _prev_tolerance > 0.5:
+        tol_category = "LOOSE" if adaptive_tol > 1e-7 else "MODERATE" if adaptive_tol > 5e-10 else "STRICT"
+        print(f"Adaptive IK tolerance: {adaptive_tol:.2e} ({tol_category}) - Manipulability: {manip:.8f} (threshold: {singularity_threshold})")
+        _prev_tolerance = adaptive_tol
+    
+    return adaptive_tol
+
+def solve_ik_with_adaptive_tol_subdivision(
         robot: DHRobot,
         target_pose: SE3,
         current_q,
         current_pose: SE3 | None = None,
         max_depth: int = 8,
-        ilimit: int = 100,
-        tol: float = 1e-10,
+        ilimit: int = 100
 ):
     """
-    Recursively subdivide the motion until ikine_LMS converges on every segment.
+    Uses adaptive tolerance based on proximity to singularities:
+    - Near singularities: looser tolerance for easier convergence
+    - Away from singularities: stricter tolerance for precise solutions
+    If necessary, recursively subdivide the motion until ikine_LMS converges on every segment.
+    
+    
+
+    Parameters
+    ----------
+    robot : DHRobot
+        Robot model
+    target_pose : SE3
+        Target pose to reach
+    current_q : array_like
+        Current joint configuration
+    current_pose : SE3, optional
+        Current pose (computed if None)
+    max_depth : int, optional
+        Maximum subdivision depth (default: 8)
+    ilimit : int, optional
+        Maximum iterations for IK solver (default: 100)
 
     Returns
     -------
     IKResult
         success  - True/False
-        q_path   - (mxn) array of the full joint trajectory (start → goal)
+        q_path   - (mxn) array of the final joint configuration 
         iterations, residual  - aggregated diagnostics
+        tolerance_used - which tolerance was used
     """
     if current_pose is None:
         current_pose = robot.fkine(current_q)
 
-    # ── inner recursive solver ────────────────────────────────────────────
-    def _solve(Ta: SE3, Tb: SE3, q_seed, depth):
+    # ── inner recursive solver───────────────────
+    def _solve(Ta: SE3, Tb: SE3, q_seed, depth, tol):
         """Return (path_list, success_flag, iterations, residual)."""
+            
         res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol)
         if res.success:
             q_good = unwrap_angles(res.q, q_seed)      # << unwrap vs *previous*
@@ -88,16 +153,15 @@ def solve_ik_with_subdivision(
 
         if depth >= max_depth:
             return [], False, res.iterations, res.residual
-
         # split the segment and recurse
         Tc = SE3(trinterp(Ta.A, Tb.A, 0.5))            # mid-pose (screw interp)
 
-        left_path,  ok_L, it_L, r_L = _solve(Ta, Tc, q_seed, depth+1)
+        left_path,  ok_L, it_L, r_L = _solve(Ta, Tc, q_seed, depth+1, tol)
         if not ok_L:
             return [], False, it_L, r_L
 
         q_mid = left_path[-1]                          # last solved joint set
-        right_path, ok_R, it_R, r_R = _solve(Tc, Tb, q_mid, depth+1)
+        right_path, ok_R, it_R, r_R = _solve(Tc, Tb, q_mid, depth+1, tol)
 
         return (
             left_path + right_path,
@@ -106,13 +170,14 @@ def solve_ik_with_subdivision(
             r_R
         )
 
-    # ── kick-off ───────────────────────────────────────────────────────────
-    path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0)
+    # ── kick-off with adaptive tolerance ──────────────────────────────────
+    adaptive_tol = calculate_adaptive_tolerance(robot, current_q)
+    path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0, adaptive_tol)
 
     if ok:
-        return IKResult(True, path[-1], its, resid)
+        return IKResult(True, path[-1], its, resid, adaptive_tol)
     else:
-        return IKResult(False, None, its, resid)
+        return IKResult(False, None, its, resid, adaptive_tol)
 
 my_os = platform.system()
 if my_os == "Windows":
@@ -453,7 +518,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 current_pose = PAROL6_ROBOT.robot.fkine(q1)
                 
                 # Use subdivision-capable IK solver
-                var = solve_ik_with_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20)
+                var = solve_ik_with_adaptive_tol_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20)
 
                 temp_var = [0,0,0,0,0,0]
                 
@@ -1081,7 +1146,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     R3.t[2] = numbers[2] / 1000
 
                                     # Use subdivision-capable IK solver for the target pose
-                                    q_pose_move = solve_ik_with_subdivision(
+                                    q_pose_move = solve_ik_with_adaptive_tol_subdivision(
                                         PAROL6_ROBOT.robot, 
                                         R3, 
                                         initial_pos,  # Use current position instead of standby
@@ -1558,7 +1623,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                         else:
                                             prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
                                         
-                                        ik_result = solve_ik_with_subdivision(
+                                        ik_result = solve_ik_with_adaptive_tol_subdivision(
                                             PAROL6_ROBOT.robot,
                                             Ctraj_traj[Command_step], 
                                             current_robot_position,
@@ -1848,7 +1913,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                         else:
                                             prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
                                         
-                                        ik_result = solve_ik_with_subdivision(
+                                        ik_result = solve_ik_with_adaptive_tol_subdivision(
                                             PAROL6_ROBOT.robot,
                                             Ctraj_traj[Command_step], 
                                             current_robot_position,
