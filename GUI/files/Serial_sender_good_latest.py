@@ -105,16 +105,16 @@ def solve_ik_with_adaptive_tol_subdivision(
         target_pose: SE3,
         current_q,
         current_pose: SE3 | None = None,
-        max_depth: int = 8,
-        ilimit: int = 100
+        max_depth: int = 4,
+        ilimit: int = 100,
+        jogging: bool = False
 ):
     """
     Uses adaptive tolerance based on proximity to singularities:
     - Near singularities: looser tolerance for easier convergence
     - Away from singularities: stricter tolerance for precise solutions
-    If necessary, recursively subdivide the motion until ikine_LMS converges on every segment.
-    
-    
+    If necessary, recursively subdivide the motion until ikine_LMS converges on every segment. From experimentation, jogging with lower tolerances often produces q_paths
+    that do not differ from current_q, essentially freezing the robot.
 
     Parameters
     ----------
@@ -171,7 +171,10 @@ def solve_ik_with_adaptive_tol_subdivision(
         )
 
     # ── kick-off with adaptive tolerance ──────────────────────────────────
-    adaptive_tol = calculate_adaptive_tolerance(robot, current_q)
+    if jogging:
+        adaptive_tol = 1e-10
+    else:
+        adaptive_tol = calculate_adaptive_tolerance(robot, current_q)
     path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0, adaptive_tol)
 
     if ok:
@@ -518,7 +521,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 current_pose = PAROL6_ROBOT.robot.fkine(q1)
                 
                 # Use subdivision-capable IK solver
-                var = solve_ik_with_adaptive_tol_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20)
+                var = solve_ik_with_adaptive_tol_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20, jogging=True)
 
                 temp_var = [0,0,0,0,0,0]
                 
