@@ -54,7 +54,7 @@ def unwrap_angles(q_solution, q_current):
     
     return q_unwrapped
 
-IKResult = namedtuple('IKResult', 'success q iterations residual tolerance_used')
+IKResult = namedtuple('IKResult', 'success q iterations residual tolerance_used violations')
 
 # Global variable to track previous tolerance for logging changes
 _prev_tolerance = None
@@ -113,8 +113,10 @@ def solve_ik_with_adaptive_tol_subdivision(
     Uses adaptive tolerance based on proximity to singularities:
     - Near singularities: looser tolerance for easier convergence
     - Away from singularities: stricter tolerance for precise solutions
-    If necessary, recursively subdivide the motion until ikine_LMS converges on every segment. From experimentation, jogging with lower tolerances often produces q_paths
-    that do not differ from current_q, essentially freezing the robot.
+    If necessary, recursively subdivide the motion until ikine_LMS converges
+    on every segment. Finally check that solution respects joint limits. From experimentation,
+    jogging with lower tolerances often produces q_paths that do not differ from current_q,
+    essentially freezing the robot.
 
     Parameters
     ----------
@@ -138,6 +140,7 @@ def solve_ik_with_adaptive_tol_subdivision(
         q_path   - (mxn) array of the final joint configuration 
         iterations, residual  - aggregated diagnostics
         tolerance_used - which tolerance was used
+        violations - joint limit violations (if any)
     """
     if current_pose is None:
         current_pose = robot.fkine(current_q)
@@ -145,7 +148,6 @@ def solve_ik_with_adaptive_tol_subdivision(
     # ── inner recursive solver───────────────────
     def _solve(Ta: SE3, Tb: SE3, q_seed, depth, tol):
         """Return (path_list, success_flag, iterations, residual)."""
-            
         res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol)
         if res.success:
             q_good = unwrap_angles(res.q, q_seed)      # << unwrap vs *previous*
@@ -176,11 +178,13 @@ def solve_ik_with_adaptive_tol_subdivision(
     else:
         adaptive_tol = calculate_adaptive_tolerance(robot, current_q)
     path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0, adaptive_tol)
-
-    if ok:
-        return IKResult(True, path[-1], its, resid, adaptive_tol)
+    # Check if solution respects joint limits
+    target_q = path[-1] if len(path) != 0 else None
+    solution_valid, violations = PAROL6_ROBOT.check_joint_limits(current_q, target_q)
+    if ok and solution_valid:
+        return IKResult(True, path[-1], its, resid, adaptive_tol, violations)
     else:
-        return IKResult(False, None, its, resid, adaptive_tol)
+        return IKResult(False, None, its, resid, adaptive_tol, violations)
 
 my_os = platform.system()
 if my_os == "Windows":
@@ -520,23 +524,27 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 # Get current pose for subdivision if needed
                 current_pose = PAROL6_ROBOT.robot.fkine(q1)
                 
-                # Use subdivision-capable IK solver
+                # Use joint-limit-aware IK solver
                 var = solve_ik_with_adaptive_tol_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20, jogging=True)
 
                 temp_var = [0,0,0,0,0,0]
                 
                 # If solver gives error DISABLE ROBOT
                 if var.success:
-                    # Unwrap angles to handle angle wrapping
-                    unwrapped_solution = unwrap_angles(var.q, q1)
-                    
                     for i in range(6):
-                        temp_var[i] = ((unwrapped_solution[i] - q1[i]) / INTERVAL_S)
+                        temp_var[i] = ((var.q[i] - q1[i]) / INTERVAL_S)
                         #print(temp_var)
                         Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(temp_var[i],i))
                         prev_speed[i] = Speed_out[i]
                 else:
-                    shared_string.value = b'Error: Inverse kinematics error - subdivision failed'
+                    if hasattr(var, 'violations') and var.violations:
+                        joint_names = list(var.violations.keys())
+                        violation_msg = f'Error: Joint limits violated: {", ".join(joint_names)}'
+                        shared_string.value = violation_msg.encode('utf-8')[:99]
+                        print("Joint limit violations:", var.violations)
+                    else:
+                        print("Error: Inverse kinematics error")
+                        shared_string.value = b'Error: Inverse kinematics error'
                     #Command_out.value = 102
                     for i in range(6):
                         Speed_out[i] = 0
@@ -1148,16 +1156,21 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     R3.t[1] =  numbers[1] / 1000  
                                     R3.t[2] = numbers[2] / 1000
 
-                                    # Use subdivision-capable IK solver for the target pose
+                                    # Use joint-limit-aware IK solver for the target pose
                                     q_pose_move = solve_ik_with_adaptive_tol_subdivision(
                                         PAROL6_ROBOT.robot, 
                                         R3, 
                                         initial_pos,  # Use current position instead of standby
-                                        ilimit=100
-                                    )
+                                        ilimit=100)
                                     
                                     if not q_pose_move.success:
-                                        shared_string.value = b'Error: MovePose() - Cannot reach target pose'
+                                        # Check if it's a joint limit issue
+                                        if hasattr(q_pose_move, 'violations') and q_pose_move.violations:
+                                            joint_names = list(q_pose_move.violations.keys())
+                                            violation_msg = f'Error: MovePose() - Joint limits violated: {", ".join(joint_names)}'
+                                            shared_string.value = violation_msg.encode('utf-8')[:99]
+                                        else:
+                                            shared_string.value = b'Error: MovePose() - Cannot reach target pose'
                                         error_state = 1
                                         Buttons[7] = 0
                                         break
@@ -1635,12 +1648,16 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                         )
                                         
                                         if ik_result.success:
-                                            # Unwrap angles to handle angle wrapping (use actual robot position)
-                                            q_solution = unwrap_angles(ik_result.q, current_robot_position)
-                                            joint_positions[Command_step] = q_solution
+                                            joint_positions[Command_step] = ik_result.q
                                         else:
-                                            print("IK failed even with subdivision")
-                                            shared_string.value = b'Error: MoveCart() - IK solution not found even with path subdivision'
+                                            if hasattr(ik_result, 'violations') and ik_result.violations:
+                                                joint_names = list(ik_result.violations.keys())
+                                                violation_msg = f'Error: MoveCart() - Joint limits violated: {", ".join(joint_names)}'
+                                                shared_string.value = violation_msg.encode('utf-8')[:99]
+                                                print("Joint limit violations in MoveCart:", ik_result.violations)
+                                            else:
+                                                print("IK failed even with subdivision")
+                                                shared_string.value = b'Error: MoveCart() - IK solution not found even with path subdivision'
                                             error_state = 1
                                             Buttons[7] = 0
                                             ik_error = 1
@@ -1925,12 +1942,16 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                         )
                                         
                                         if ik_result.success:
-                                            # Unwrap angles to handle angle wrapping (use actual robot position)
-                                            q_solution = unwrap_angles(ik_result.q, current_robot_position)
-                                            joint_positions[Command_step] = q_solution
+                                            joint_positions[Command_step] = ik_result.q
                                         else:
-                                            print("IK failed even with subdivision")
-                                            shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found even with path subdivision'
+                                            if hasattr(ik_result, 'violations') and ik_result.violations:
+                                                joint_names = list(ik_result.violations.keys())
+                                                violation_msg = f'Error: MoveCartRelTRF() - Joint limits violated: {", ".join(joint_names)}'
+                                                shared_string.value = violation_msg.encode('utf-8')[:99]
+                                                print("Joint limit violations in MoveCartRelTRF:", ik_result.violations)
+                                            else:
+                                                print("IK failed even with subdivision")
+                                                shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found even with path subdivision'
                                             error_state = 1
                                             Buttons[7] = 0
                                             ik_error = 1
