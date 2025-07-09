@@ -1,13 +1,16 @@
 # PAROL-commander-software
-[![License: MIT](https://img.shields.io/badge/license-GPLv3-blue)](https://opensource.org/license/gpl-3-0/)
+[![License: MIT](https://img.shields.io/badge/license-GPLv3-blue)](https://opensource.org/license/gpl-3-0/)  ![Issues](https://img.shields.io/github/issues/PCrnjak/PAROL-commander-software) ![release](https://img.shields.io/github/v/release/PCrnjak/PAROL-commander-software) [![Powered by the Robotics Toolbox](https://raw.githubusercontent.com/petercorke/robotics-toolbox-python/master/.github/svg/rtb_powered.min.svg)](https://github.com/petercorke/robotics-toolbox-python)
+
 
 <img src="Images/screen_2.png" alt="drawing" width="700"/>
 
 https://source-robotics.com
 
+To use commander software your PC needs to meet some [minimal hardware specs!](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
+
 Robot arm building instructions, STL files, BOM can be found here: [Link](https://github.com/PCrnjak/PAROL6-Desktop-robot-arm)
 
-To run this code you need to use PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
+To run this code you need to use the PAROL6 control board! You can buy it here: [Link!](https://source-robotics.com/products/parol6-control-board)
 
 PAROL6 commander software is a tool for controlling and programming the PAROL6 robotic arm!
 Some of the features are: <br />
@@ -20,6 +23,7 @@ Some of the features are: <br />
 * Built-in simulator
 * Programming interface with simple-to-use commands
 * Real-time control of robot outputs and reading of inputs
+* Built-in control for [SSG-48 adaptive electric gripper](https://source-robotics.com/products/compliant-gripper)
 
 # What is PAROL6 robotic arm?
 
@@ -31,8 +35,20 @@ To run the PAROL6 robotic arm with commander software you will need to meet some
 Check already tested systems and compare them to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
 # How to install 
+
+Tested on python 3.10.12 <br />
+
+**Manual**<br />
 How to install on the Linux: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Linux_install.md)<br />
 How to install on Windows: [Link](https://github.com/PCrnjak/PAROL-commander-software/blob/main/Windows_install.md)
+<br /> **Also works on MAC, just follow the Linux install guide.
+
+**Using requirements.txt**<br />
+pip install -r requirements.txt
+
+For Linux you will also have to:<br />
+sudo apt-get install python3-tk<br />
+sudo apt-get install python3-pil python3-pil.imagetk<br />
 
 # Dependency
 
@@ -47,7 +63,7 @@ How to use PAROL commander software can be found in [DOCS](https://source-roboti
 Join [Discord](https://discord.com/invite/prjUvjmGpZ ) community!
 - [Youtube](https://www.youtube.com/channel/UCp3sDRwVkbm7b2M-2qwf5aQ)
 - [Hackaday](https://hackaday.io/project/167247-faze4-robotic-arm)
-- [Instagram](https://www.instagram.com/5arcrnjak/)
+- [Instagram](https://www.instagram.com/source_robotics/)
 - [DOCS](https://source-robotics.github.io/PAROL-docs/)
 
   
@@ -59,9 +75,9 @@ General features:
   - ROS2 support
   - Moveit example
   - ROBODK postprocessor
-  - TODO -> Stepper driver stages need to go to short or all fets low when power button is pressed
+  - TODO -> Stepper driver stages need to go to short or all fets low when the power button is pressed
   - TODO ->Implement Swift simulator - https://github.com/jhavl/swift
-  - TODO -> Create executable files for windows and linux
+  - TODO -> Create executable files for windows and Linux
 
   PAROL6 commander software features:
   - Reading GCODE commands
@@ -75,5 +91,11 @@ General features:
 # Liability 
 1. The software is still in development and may contain bugs, errors, or incomplete features.
 2. Users are encouraged to use this software responsibly and at their own risk.
+
+# Support
+This project is entirely open source and free for all to use. Any support, whether through donations or advice, is greatly appreciated. Thank you!
+
+ [![General badge](https://img.shields.io/badge/PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white)](https://paypal.me/PCrnjak?locale.x=en_US)
+[![General badge](https://img.shields.io/badge/Patreon-F96854?style=for-the-badge&logo=patreon&logoColor=white)](https://www.patreon.com/PCrnjak)
 
 # Project is under GPLv3 Licence

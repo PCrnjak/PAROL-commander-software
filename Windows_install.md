@@ -12,10 +12,10 @@
      pip3 install roboticstoolbox-python==1.0.3
     
     pip3 install swift-sim==1.0.1
-    sudo apt-get install python3-tk
     pip3 install pgraph-python
     pip3 install progress
     pip3 install numpy==1.23.4
+    pip3 install scipy==1.11.4
   
 ## Clone commander repo
     git clone https://github.com/PCrnjak/PAROL-commander-software.git
