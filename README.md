@@ -1,10 +1,13 @@
 # PAROL-commander-software
+
 [![License: MIT](https://img.shields.io/badge/license-GPLv3-blue)](https://opensource.org/license/gpl-3-0/)  ![Issues](https://img.shields.io/github/issues/PCrnjak/PAROL-commander-software) ![release](https://img.shields.io/github/v/release/PCrnjak/PAROL-commander-software) [![Powered by the Robotics Toolbox](https://raw.githubusercontent.com/petercorke/robotics-toolbox-python/master/.github/svg/rtb_powered.min.svg)](https://github.com/petercorke/robotics-toolbox-python)
 
 
 <img src="Images/screen_2.png" alt="drawing" width="700"/>
 
-https://source-robotics.com
+> [!CAUTION]
+> You can use [Experimental kineamtics branch](https://github.com/PCrnjak/PAROL-commander-software/tree/experimental_kinematics) which resolves most Cartesian jogging errors but introduces potentially dangerous conditions. Use experimental kinematics branch at your own risk, as it may damage the robot! Main branch is safe.
+>
 
 To use commander software your PC needs to meet some [minimal hardware specs!](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
