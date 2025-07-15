@@ -148,7 +148,25 @@ def solve_ik_with_adaptive_tol_subdivision(
     # ── inner recursive solver───────────────────
     def _solve(Ta: SE3, Tb: SE3, q_seed, depth, tol):
         """Return (path_list, success_flag, iterations, residual)."""
-        res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol)
+        # Calculate current and target reach
+        current_reach = np.linalg.norm(Ta.t)
+        target_reach = np.linalg.norm(Tb.t)
+        
+        # Check if this is an inward movement (recovery)
+        is_recovery = target_reach < current_reach
+        
+        # Determine damping based on reach and movement direction
+        if is_recovery:
+            # Recovery mode - always use low damping
+            damping = 0.001
+        else:
+            # Check if we're near max reach
+            if current_reach > 0.45:  # Near workspace boundary. Value from experimentation
+                damping = 0.1  # High damping for stability
+            else:
+                damping = 0.001  # Normal low damping
+        
+        res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol, wN=damping)
         if res.success:
             q_good = unwrap_angles(res.q, q_seed)      # << unwrap vs *previous*
             return [q_good], True, res.iterations, res.residual
