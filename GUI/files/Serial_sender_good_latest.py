@@ -161,7 +161,8 @@ def solve_ik_with_adaptive_tol_subdivision(
             damping = 0.001
         else:
             # Check if we're near max reach
-            if current_reach > 0.45:  # Near workspace boundary. Value from experimentation
+            print(f"current_reach: {current_reach}")
+            if current_reach > 0.44:  # Near workspace boundary. Value from experimentation
                 damping = 0.1  # High damping for stability
             else:
                 damping = 0.001  # Normal low damping
