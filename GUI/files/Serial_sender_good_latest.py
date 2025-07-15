@@ -10,13 +10,14 @@ import GUI_PAROL_latest
 import SIMULATOR_Robot
 import PAROL6_ROBOT 
 import numpy as np
-from spatialmath import *
+from spatialmath import SE3
+from spatialmath.base import trinterp
+from collections import namedtuple
 import platform
 import os
 import re
 import math
-from roboticstoolbox import trapezoidal
-from roboticstoolbox import quintic
+from roboticstoolbox import trapezoidal, DHRobot, quintic
 from spatialmath.base.argcheck import (
     isvector,
     getvector,
@@ -24,13 +25,174 @@ from spatialmath.base.argcheck import (
     getvector,
     isscalar,
 )
+def normalize_angle(angle):
+    """Normalize angle to [-pi, pi] range to handle angle wrapping"""
+    while angle > np.pi:
+        angle -= 2 * np.pi
+    while angle < -np.pi:
+        angle += 2 * np.pi
+    return angle
 
+def unwrap_angles(q_solution, q_current):
+    """
+    Unwrap angles in the solution to be closest to current position.
+    This handles the angle wrapping issue where -179° and 181° are close but appear far.
+    """
+    q_unwrapped = q_solution.copy()
+    
+    for i in range(len(q_solution)):
+        # Calculate the difference
+        diff = q_solution[i] - q_current[i]
+        
+        # If the difference is more than pi, we need to unwrap
+        if diff > np.pi:
+            # Solution is too far in positive direction, subtract 2*pi
+            q_unwrapped[i] = q_solution[i] - 2 * np.pi
+        elif diff < -np.pi:
+            # Solution is too far in negative direction, add 2*pi
+            q_unwrapped[i] = q_solution[i] + 2 * np.pi
+    
+    return q_unwrapped
 
+IKResult = namedtuple('IKResult', 'success q iterations residual tolerance_used violations')
+
+# Global variable to track previous tolerance for logging changes
+_prev_tolerance = None
+
+def calculate_adaptive_tolerance(robot, q, strict_tol=1e-10, loose_tol=1e-7):
+    """
+    Calculate adaptive tolerance based on proximity to singularities.
+    Near singularities: looser tolerance for easier convergence.
+    Away from singularities: stricter tolerance for precise solutions.
+    
+    Parameters
+    ----------
+    robot : DHRobot
+        Robot model
+    q : array_like
+        Joint configuration
+    strict_tol : float
+        Strict tolerance away from singularities (default: 1e-10)
+    loose_tol : float
+        Loose tolerance near singularities (1e-7)
+        
+    Returns
+    -------
+    float
+        Adaptive tolerance value
+    """
+    global _prev_tolerance
+    
+    q_array = np.array(q, dtype=float)
+    
+    # Calculate manipulability measure (closer to 0 = closer to singularity)
+    manip = robot.manipulability(q_array)
+    singularity_threshold = 0.001
+    
+    sing_normalized = np.clip(manip / singularity_threshold, 0.0, 1.0)
+    adaptive_tol = loose_tol + (strict_tol - loose_tol) * sing_normalized
+    
+    # Log tolerance changes (only log significant changes to avoid spam)
+    if _prev_tolerance is None or abs(adaptive_tol - _prev_tolerance) / _prev_tolerance > 0.5:
+        tol_category = "LOOSE" if adaptive_tol > 1e-7 else "MODERATE" if adaptive_tol > 5e-10 else "STRICT"
+        print(f"Adaptive IK tolerance: {adaptive_tol:.2e} ({tol_category}) - Manipulability: {manip:.8f} (threshold: {singularity_threshold})")
+        _prev_tolerance = adaptive_tol
+    
+    return adaptive_tol
+
+def solve_ik_with_adaptive_tol_subdivision(
+        robot: DHRobot,
+        target_pose: SE3,
+        current_q,
+        current_pose: SE3 | None = None,
+        max_depth: int = 4,
+        ilimit: int = 100,
+        jogging: bool = False
+):
+    """
+    Uses adaptive tolerance based on proximity to singularities:
+    - Near singularities: looser tolerance for easier convergence
+    - Away from singularities: stricter tolerance for precise solutions
+    If necessary, recursively subdivide the motion until ikine_LMS converges
+    on every segment. Finally check that solution respects joint limits. From experimentation,
+    jogging with lower tolerances often produces q_paths that do not differ from current_q,
+    essentially freezing the robot.
+
+    Parameters
+    ----------
+    robot : DHRobot
+        Robot model
+    target_pose : SE3
+        Target pose to reach
+    current_q : array_like
+        Current joint configuration
+    current_pose : SE3, optional
+        Current pose (computed if None)
+    max_depth : int, optional
+        Maximum subdivision depth (default: 8)
+    ilimit : int, optional
+        Maximum iterations for IK solver (default: 100)
+
+    Returns
+    -------
+    IKResult
+        success  - True/False
+        q_path   - (mxn) array of the final joint configuration 
+        iterations, residual  - aggregated diagnostics
+        tolerance_used - which tolerance was used
+        violations - joint limit violations (if any)
+    """
+    if current_pose is None:
+        current_pose = robot.fkine(current_q)
+
+    # ── inner recursive solver───────────────────
+    def _solve(Ta: SE3, Tb: SE3, q_seed, depth, tol):
+        """Return (path_list, success_flag, iterations, residual)."""
+        res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol)
+        if res.success:
+            q_good = unwrap_angles(res.q, q_seed)      # << unwrap vs *previous*
+            return [q_good], True, res.iterations, res.residual
+
+        if depth >= max_depth:
+            return [], False, res.iterations, res.residual
+        # split the segment and recurse
+        Tc = SE3(trinterp(Ta.A, Tb.A, 0.5))            # mid-pose (screw interp)
+
+        left_path,  ok_L, it_L, r_L = _solve(Ta, Tc, q_seed, depth+1, tol)
+        if not ok_L:
+            return [], False, it_L, r_L
+
+        q_mid = left_path[-1]                          # last solved joint set
+        right_path, ok_R, it_R, r_R = _solve(Tc, Tb, q_mid, depth+1, tol)
+
+        return (
+            left_path + right_path,
+            ok_R,
+            it_L + it_R,
+            r_R
+        )
+
+    # ── kick-off with adaptive tolerance ──────────────────────────────────
+    if jogging:
+        adaptive_tol = 1e-10
+    else:
+        adaptive_tol = calculate_adaptive_tolerance(robot, current_q)
+    path, ok, its, resid = _solve(current_pose, target_pose, current_q, 0, adaptive_tol)
+    # Check if solution respects joint limits
+    target_q = path[-1] if len(path) != 0 else None
+    solution_valid, violations = PAROL6_ROBOT.check_joint_limits(current_q, target_q)
+    if ok and solution_valid:
+        return IKResult(True, path[-1], its, resid, adaptive_tol, violations)
+    else:
+        return IKResult(False, None, its, resid, adaptive_tol, violations)
 
 my_os = platform.system()
 if my_os == "Windows":
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Windows")
+elif my_os == "Darwin":
+    Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
+    logging.debug("Os is Mac")
 else: 
     Image_path = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     logging.debug("Os is Linux")
@@ -42,11 +204,14 @@ logging.basicConfig(level = logging.DEBUG,
 )
 
 if my_os == "Windows": 
-    STARTING_PORT = 58 # COM3
+    STARTING_PORT = 6 # COM3
+elif my_os == "Darwin":
+    STARTING_PORT = 0 # Mac uses different port naming
 else:   
     STARTING_PORT = 0
 # if using linux this will add /dev/ttyACM + 0 ---> /dev/ttyACM0
 # if using windows this will add COM + 3 ---> COM3 
+# if using mac this will add /dev/tty.usbmodem + 0 ---> /dev/tty.usbmodem0 (placeholder)
 str_port = ''
 logging.disable(logging.DEBUG)
 if my_os == "Windows":
@@ -61,6 +226,16 @@ elif my_os == "Linux":
         ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
     except:
         ser = serial.Serial()
+elif my_os == "Darwin":
+    try:
+        # Mac users will need to set the correct port in the GUI
+        # Common Mac serial port patterns: /dev/tty.usbmodem*, /dev/tty.usbserial*
+        str_port = '/dev/tty.usbmodem' + str(STARTING_PORT)
+        ser = serial.Serial(port=str_port, baudrate=3000000, timeout=0)
+    except:
+        ser = serial.Serial()
+else:
+    ser = serial.Serial()
 #ser.open()
 
 # in big endian machines, first byte of binary representation of the multibyte data-type is stored first. 
@@ -346,22 +521,33 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             shared_string.value = b'Log: TRF X- Rotation '
                         
 
-                var = PAROL6_ROBOT.robot.ikine_LMS(T,q0 = q1, ilimit = 6) # Get joint angles
+                # Get current pose for subdivision if needed
+                current_pose = PAROL6_ROBOT.robot.fkine(q1)
+                
+                # Use joint-limit-aware IK solver
+                var = solve_ik_with_adaptive_tol_subdivision(PAROL6_ROBOT.robot, T, q1, current_pose, ilimit=20, jogging=True)
 
                 temp_var = [0,0,0,0,0,0]
-                for i in range(6):
-
-                    temp_var[i] = ((var[0][i] - q1[i]) / INTERVAL_S)
-                    #print(temp_var)
-
-                    # If solver gives error DISABLE ROBOT
-                    if var.success:
+                
+                # If solver gives error DISABLE ROBOT
+                if var.success:
+                    for i in range(6):
+                        temp_var[i] = ((var.q[i] - q1[i]) / INTERVAL_S)
+                        #print(temp_var)
                         Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(temp_var[i],i))
                         prev_speed[i] = Speed_out[i]
+                else:
+                    if hasattr(var, 'violations') and var.violations:
+                        joint_names = list(var.violations.keys())
+                        violation_msg = f'Error: Joint limits violated: {", ".join(joint_names)}'
+                        shared_string.value = violation_msg.encode('utf-8')[:99]
+                        print("Joint limit violations:", var.violations)
                     else:
-                        shared_string.value = b'Error: Inverse kinematics error '
-                        #Command_out.value = 102
-                        #Speed_out[i] = 0
+                        print("Error: Inverse kinematics error")
+                        shared_string.value = b'Error: Inverse kinematics error'
+                    #Command_out.value = 102
+                    for i in range(6):
+                        Speed_out[i] = 0
                     # If any joint passed its position limit, disable robot
 
 
@@ -970,7 +1156,25 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     R3.t[1] =  numbers[1] / 1000  
                                     R3.t[2] = numbers[2] / 1000
 
-                                    q_pose_move = PAROL6_ROBOT.robot.ikine_LMS(R3,q0 = PAROL6_ROBOT.Joints_standby_position_radian,  ilimit = 60)
+                                    # Use joint-limit-aware IK solver for the target pose
+                                    q_pose_move = solve_ik_with_adaptive_tol_subdivision(
+                                        PAROL6_ROBOT.robot, 
+                                        R3, 
+                                        initial_pos,  # Use current position instead of standby
+                                        ilimit=100)
+                                    
+                                    if not q_pose_move.success:
+                                        # Check if it's a joint limit issue
+                                        if hasattr(q_pose_move, 'violations') and q_pose_move.violations:
+                                            joint_names = list(q_pose_move.violations.keys())
+                                            violation_msg = f'Error: MovePose() - Joint limits violated: {", ".join(joint_names)}'
+                                            shared_string.value = violation_msg.encode('utf-8')[:99]
+                                        else:
+                                            shared_string.value = b'Error: MovePose() - Cannot reach target pose'
+                                        error_state = 1
+                                        Buttons[7] = 0
+                                        break
+                                    
                                     joint_angle_pose = np.array([q_pose_move.q[0],q_pose_move.q[1],q_pose_move.q[2],q_pose_move.q[3],q_pose_move.q[4],q_pose_move.q[5]])
 
                                     needed_pos = np.array([joint_angle_pose[0] + 0.0000001,
@@ -1419,77 +1623,116 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             elif Command_step != Command_len : #
 
                                 if ik_error == 0:
-                                    # Calculate joint positons from matrix crated by ctraj
-                                    temp[Command_step] = PAROL6_ROBOT.robot.ikine_LMS(Ctraj_traj[Command_step],q0 = joint_positions[Command_step-1], ilimit = 60)
-                                    joint_positions[Command_step] = temp[Command_step][0]
-                                    #print("results")
-                                    #print(temp[Command_step])
-                                    #print(temp[Command_step].success)
-                                    if str(temp[Command_step].success) == 'False':
-                                        print("i am false")
-                                        shared_string.value = b'Error: MoveCart() IK error'
+                                    # Use actual robot position as IK initial guess (same as cartesian jogging)
+                                    current_robot_position = np.array([PAROL6_ROBOT.STEPS2RADS(Position_in[0],0),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[1],1),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[2],2),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[3],3),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
+                                    
+                                    # Use subdivision-capable IK solver
+                                    try:
+                                        # Get previous pose for better subdivision
+                                        if Command_step > 0:
+                                            prev_pose = Ctraj_traj[Command_step - 1]
+                                        else:
+                                            prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
+                                        
+                                        ik_result = solve_ik_with_adaptive_tol_subdivision(
+                                            PAROL6_ROBOT.robot,
+                                            Ctraj_traj[Command_step], 
+                                            current_robot_position,
+                                            prev_pose,
+                                            ilimit=100
+                                        )
+                                        
+                                        if ik_result.success:
+                                            joint_positions[Command_step] = ik_result.q
+                                        else:
+                                            if hasattr(ik_result, 'violations') and ik_result.violations:
+                                                joint_names = list(ik_result.violations.keys())
+                                                violation_msg = f'Error: MoveCart() - Joint limits violated: {", ".join(joint_names)}'
+                                                shared_string.value = violation_msg.encode('utf-8')[:99]
+                                                print("Joint limit violations in MoveCart:", ik_result.violations)
+                                            else:
+                                                print("IK failed even with subdivision")
+                                                shared_string.value = b'Error: MoveCart() - IK solution not found even with path subdivision'
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            ik_error = 1
+                                    except Exception as e:
+                                        print("IK error:", str(e))
+                                        shared_string.value = b'Error: MoveCart() - IK calculation failed: ' + bytes(str(e)[:50], 'utf-8')
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
                                         
-                                    # Check if positons are in valid range
+                                    # Only continue with velocity calculation if IK was successful
+                                    if ik_error == 0:
+                                        # Calculate needed speed
+                                        for i in range(6):
+                                            
+                                            velocity_array[i] = (joint_positions[Command_step][i]  - joint_positions[Command_step-1][i] ) / INTERVAL_S 
 
-                                    # Calculate needed speed
-                                    for i in range(6):
+
+                                        # Set speeds and positions
+                                        for i in range(6):
+                                            # Ensure we convert numpy arrays/floats to Python scalars before int conversion
+                                            pos_val = float(joint_positions[Command_step][i])
+                                            vel_val = float(velocity_array[i])
+                                            
+                                            Position_out[i] = int(PAROL6_ROBOT.RAD2STEPS(pos_val, i))
+                                            Speed_out[i] = int(PAROL6_ROBOT.SPEED_RAD2STEP(vel_val, i))
                                         
-                                        velocity_array[i] = (joint_positions[Command_step][i]  - joint_positions[Command_step-1][i] ) / INTERVAL_S 
-
-
-                                    # Set speeds and positions
-                                    for i in range(6):
-
-                                        Position_out[i] = (int(PAROL6_ROBOT.RAD2STEPS(joint_positions[Command_step][i],i)))
-                                        Speed_out[i] =  int(PAROL6_ROBOT.SPEED_RAD2STEP(velocity_array[i]  ,i)) 
-                                        
-                                    #print("joint positons are:", joint_positions[Command_step])
-                                    if tracking == None:
-                                        Command_out.value = 156
-                                    elif tracking == "speed":
-                                        Command_out.value = 123
-                                    else:
-                                        Command_out.value = 255
-                                    
-                                    # Check if positons are in valid range
-
-
-                                    threshold_value_flip = 0.7
-                                    zero_threshold = 0.0001
-                                    # check if robot switches configurations by going from positive to negative angle!
-                                
-                                    for i in range(6):
-                                        # if values are close to zero they flactuate a lot 
-                                        if abs(joint_positions[Command_step][i]) <= zero_threshold and abs(joint_positions[Command_step-1][i]) <= zero_threshold:
-                                            None
-                                        # Check if the absolute difference between the absolute values of 'a' and 'b' is less than or equal to the threshold
+                                        #print("joint positons are:", joint_positions[Command_step])
+                                        if tracking == None:
+                                            Command_out.value = 156
+                                        elif tracking == "speed":
+                                            Command_out.value = 123
                                         else:
-                                            if abs(abs(joint_positions[Command_step][i]) - abs( joint_positions[Command_step-1][i])) <= threshold_value_flip:
-                                                # Check if 'a' and 'b' have opposite signs
-                                                if (joint_positions[Command_step][i] > 0 and joint_positions[Command_step-1][i] < 0) or (joint_positions[Command_step][i] < 0 and joint_positions[Command_step-1][i] > 0):
-                                                    shared_string.value = b'Error: MoveCart() sign of position flipped'
-                                                    print("ik flip error in joint:", i)
-                                                    error_state = 1
-                                                    Buttons[7] = 0
-                                                    Speed_out[i] = 0
-                                                    Command_out.value = 255
-    	                            
-
-                                    Command_step = Command_step + 1
-
-                                    # check the speeds
-                                    
-                                    for i in range(6):
-                                        if  abs(Speed_out[i] > PAROL6_ROBOT.Joint_max_speed[i]):
-                                            shared_string.value = b'Error: MoveCart() speed is too big'
-                                            print("error in joint:", i)
-                                            error_state = 1
-                                            Buttons[7] = 0
-                                            Speed_out[i] = 0
                                             Command_out.value = 255
+                                        
+                                        # Check if positons are in valid range
+
+
+                                        # Improved configuration flip detection using angle normalization
+                                        threshold_value_flip = 1.5  # Increased threshold for real configuration changes
+                                        
+                                        for i in range(6):
+                                            # Normalize angles to [-pi, pi] range to handle angle wrapping
+                                            curr_angle = normalize_angle(joint_positions[Command_step][i])
+                                            prev_angle = normalize_angle(joint_positions[Command_step-1][i])
+                                            
+                                            # Calculate the actual angular difference
+                                            angle_diff = abs(curr_angle - prev_angle)
+                                            
+                                            # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
+                                            if angle_diff > np.pi:
+                                                angle_diff = 2 * np.pi - angle_diff
+                                            
+                                            # Only flag if there's a real large movement (not angle wrapping)
+                                            if angle_diff > threshold_value_flip:
+                                                shared_string.value = b'Error: MoveCart() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
+                                                print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
+                                                error_state = 1
+                                                Buttons[7] = 0
+                                                Speed_out[i] = 0
+                                                Command_out.value = 255
+        	                            
+
+                                        Command_step = Command_step + 1
+
+                                        # check the speeds
+                                        
+                                        for i in range(6):
+                                            if  abs(Speed_out[i] > PAROL6_ROBOT.Joint_max_speed[i]):
+                                                shared_string.value = b'Error: MoveCart() speed is too big'
+                                                print("error in joint:", i)
+                                                error_state = 1
+                                                Buttons[7] = 0
+                                                Speed_out[i] = 0
+                                                Command_out.value = 255
                                     
 
                                 else: 
@@ -1674,15 +1917,47 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                             elif Command_step != Command_len : #
 
                                 if ik_error == 0:
-                                    # Calculate joint positons from matrix crated by ctraj
-                                    temp[Command_step] = PAROL6_ROBOT.robot.ikine_LMS(Ctraj_traj[Command_step],q0 = joint_positions[Command_step-1], ilimit = 60)
-                                    joint_positions[Command_step] = temp[Command_step][0]
-                                    #print("results")
-                                    #print(temp[Command_step])
-                                    #print(temp[Command_step].success)
-                                    if str(temp[Command_step].success) == 'False':
-                                        print("i am false")
-                                        shared_string.value = b'Error: MoveCartRelTRF() IK error'
+                                    # Use actual robot position as IK initial guess (same as cartesian jogging)
+                                    current_robot_position = np.array([PAROL6_ROBOT.STEPS2RADS(Position_in[0],0),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[1],1),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[2],2),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[3],3),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[4],4),
+                                                                      PAROL6_ROBOT.STEPS2RADS(Position_in[5],5),])
+                                    
+                                    # Use subdivision-capable IK solver
+                                    try:
+                                        # Get previous pose for better subdivision
+                                        if Command_step > 0:
+                                            prev_pose = Ctraj_traj[Command_step - 1]
+                                        else:
+                                            prev_pose = PAROL6_ROBOT.robot.fkine(current_robot_position)
+                                        
+                                        ik_result = solve_ik_with_adaptive_tol_subdivision(
+                                            PAROL6_ROBOT.robot,
+                                            Ctraj_traj[Command_step], 
+                                            current_robot_position,
+                                            prev_pose,
+                                            ilimit=100
+                                        )
+                                        
+                                        if ik_result.success:
+                                            joint_positions[Command_step] = ik_result.q
+                                        else:
+                                            if hasattr(ik_result, 'violations') and ik_result.violations:
+                                                joint_names = list(ik_result.violations.keys())
+                                                violation_msg = f'Error: MoveCartRelTRF() - Joint limits violated: {", ".join(joint_names)}'
+                                                shared_string.value = violation_msg.encode('utf-8')[:99]
+                                                print("Joint limit violations in MoveCartRelTRF:", ik_result.violations)
+                                            else:
+                                                print("IK failed even with subdivision")
+                                                shared_string.value = b'Error: MoveCartRelTRF() - IK solution not found even with path subdivision'
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            ik_error = 1
+                                    except Exception as e:
+                                        print("IK error:", str(e))
+                                        shared_string.value = b'Error: MoveCartRelTRF() - IK calculation failed: ' + bytes(str(e)[:50], 'utf-8')
                                         error_state = 1
                                         Buttons[7] = 0
                                         ik_error = 1
@@ -1712,25 +1987,29 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                                     # Check if positons are in valid range
 
 
-                                    threshold_value_flip = 0.7
-                                    zero_threshold = 0.0001
-                                    # check if robot switches configurations by going from positive to negative angle!
-                                
+                                    # Improved configuration flip detection using angle normalization
+                                    threshold_value_flip = 1.5  # Increased threshold for real configuration changes
+                                    
                                     for i in range(6):
-                                        # if values are close to zero they flactuate a lot 
-                                        if abs(joint_positions[Command_step][i]) <= zero_threshold and abs(joint_positions[Command_step-1][i]) <= zero_threshold:
-                                            None
-                                        # Check if the absolute difference between the absolute values of 'a' and 'b' is less than or equal to the threshold
-                                        else:
-                                            if abs(abs(joint_positions[Command_step][i]) - abs( joint_positions[Command_step-1][i])) <= threshold_value_flip:
-                                                # Check if 'a' and 'b' have opposite signs
-                                                if (joint_positions[Command_step][i] > 0 and joint_positions[Command_step-1][i] < 0) or (joint_positions[Command_step][i] < 0 and joint_positions[Command_step-1][i] > 0):
-                                                    shared_string.value = b'Error: MoveCartRelTRF() sign of position flipped'
-                                                    print("ik flip error in joint:", i)
-                                                    error_state = 1
-                                                    Buttons[7] = 0
-                                                    Speed_out[i] = 0
-                                                    Command_out.value = 255
+                                        # Normalize angles to [-pi, pi] range to handle angle wrapping
+                                        curr_angle = normalize_angle(joint_positions[Command_step][i])
+                                        prev_angle = normalize_angle(joint_positions[Command_step-1][i])
+                                        
+                                        # Calculate the actual angular difference
+                                        angle_diff = abs(curr_angle - prev_angle)
+                                        
+                                        # Check for angle wrapping (jumps > π indicate wrapping, not real movement)
+                                        if angle_diff > np.pi:
+                                            angle_diff = 2 * np.pi - angle_diff
+                                        
+                                        # Only flag if there's a real large movement (not angle wrapping)
+                                        if angle_diff > threshold_value_flip:
+                                            shared_string.value = b'Error: MoveCartRelTRF() large joint movement detected in joint: ' + bytes(str(i+1), 'utf-8')
+                                            print("Large joint movement detected in joint:", i+1, "angle diff:", angle_diff)
+                                            error_state = 1
+                                            Buttons[7] = 0
+                                            Speed_out[i] = 0
+                                            Command_out.value = 255
     	                            
 
                                     Command_step = Command_step + 1
@@ -1844,6 +2123,18 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                     com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
+                elif my_os == 'Darwin':
+                    # For Mac, check if full path mode is enabled
+                    if General_data[0] == -1:
+                        # Use full path from shared_string
+                        com_port = shared_string.value.decode('utf-8')
+                        # Fallback to default if shared_string is empty
+                        if not com_port or com_port.isspace():
+                            com_port = '/dev/tty.usbmodem0'
+                    elif General_data[0] == 0:
+                        com_port = '/dev/tty.usbmodem0'  # Default placeholder
+                    else:
+                        com_port = '/dev/tty.usbmodem' + str(General_data[0])
                     
                 print(com_port)
                 ser.port = com_port
@@ -1854,7 +2145,7 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                 time.sleep(0.5)
             except:
                 time.sleep(0.5)
-                logging.debug("no serial available, reconnecting!")   
+                logging.debug("no serial available, reconnecting!")
 
         timer.checkpt()
 
@@ -1914,6 +2205,18 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
                     com_port = '/dev/ttyACM' + str(General_data[0])
                 elif my_os == 'Windows':
                     com_port = 'COM' + str(General_data[0])
+                elif my_os == 'Darwin':
+                    # For Mac, check if full path mode is enabled
+                    if General_data[0] == -1:
+                        # Use full path from shared_string
+                        com_port = shared_string.value.decode('utf-8')
+                        # Fallback to default if shared_string is empty
+                        if not com_port or com_port.isspace():
+                            com_port = '/dev/tty.usbmodem0'
+                    elif General_data[0] == 0:
+                        com_port = '/dev/tty.usbmodem0'  # Default placeholder
+                    else:
+                        com_port = '/dev/tty.usbmodem' + str(General_data[0])
                     
                 
                 print(com_port)
@@ -1925,7 +2228,7 @@ def Task2(shared_string,Position_in,Speed_in,Homed_in,InOut_in,Temperature_error
                 time.sleep(0.5)
             except:
                 time.sleep(0.5)
-                logging.debug("no serial available, reconnecting!")                    
+                logging.debug("no serial available, reconnecting!")
         #Get_data_old()
         #print("Task 2 alive")
         #time.sleep(2)
@@ -2689,8 +2992,8 @@ if __name__ == '__main__':
     # Speed slider, acc slider, WRF/TRF 
     Jog_control = multiprocessing.Array("i",[0,0,0,0], lock=False) 
 
-    # COM PORT, BAUD RATE, 
-    General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000], lock=False) 
+    # COM PORT, BAUD RATE, additional space for macOS full path flag
+    General_data =  multiprocessing.Array("i",[STARTING_PORT,3000000,0], lock=False)
 
     # Home,Enable,Disable,Clear error,Real_robot,Sim_robot, demo_app, program execution,
     Buttons =  multiprocessing.Array("i",[0,0,0,0,1,1,0,0,0], lock=False) 
@@ -2727,8 +3030,3 @@ if __name__ == '__main__':
     process1.terminate()
     process2.terminate()
     process3.terminate()
-
-
-
-
-
