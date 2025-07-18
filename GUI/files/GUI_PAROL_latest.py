@@ -186,6 +186,17 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
         app.COMPORT = customtkinter.CTkEntry(app.bottom_select_frame, width= 150)
         app.COMPORT.grid(row=3, column=5, padx=(0, 0),pady=(3,3),sticky="E")
 
+        # Add a helpful label for macOS users
+        if my_os == "Darwin":
+            app.COMPORT_label = customtkinter.CTkLabel(app.bottom_select_frame, text="Port (e.g., /dev/tty.usbmodem*)", font=customtkinter.CTkFont(size=10))
+            app.COMPORT_label.grid(row=2, column=5, padx=(0, 0), pady=(3,0), sticky="E")
+        elif my_os == "Windows":
+            app.COMPORT_label = customtkinter.CTkLabel(app.bottom_select_frame, text="Port (e.g., 3 for COM3)", font=customtkinter.CTkFont(size=10))
+            app.COMPORT_label.grid(row=2, column=5, padx=(0, 0), pady=(3,0), sticky="E")
+        else:  # Linux
+            app.COMPORT_label = customtkinter.CTkLabel(app.bottom_select_frame, text="Port (e.g., 0 for ttyACM0)", font=customtkinter.CTkFont(size=10))
+            app.COMPORT_label.grid(row=2, column=5, padx=(0, 0), pady=(3,0), sticky="E")
+
         app.Connect_button = customtkinter.CTkButton(app.bottom_select_frame,text="Connect", font = customtkinter.CTkFont(size=15, family='TkDefaultFont'),command = Set_comm_port)
         app.Connect_button.grid(row=3, column=8, padx=padx_top_bot,pady = 10,sticky="e")
 
@@ -1079,15 +1090,41 @@ def GUI(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,InOu
     def Set_comm_port():
 
         COMPORT_value = app.COMPORT.get()
-        pattern = re.compile(r'\D*(\d+)\D*')
-        match = pattern.match(COMPORT_value)
-        if match:
-           com_number = int(match.group(1))
-           General_data[0] = com_number
+        
+        # For macOS, allow full port paths
+        if my_os == "Darwin":
+            # If input looks like a full path, store it as a string in General_data[2]
+            if COMPORT_value.startswith('/dev/'):
+                # Store the full path in a new General_data index for macOS
+                if len(General_data) < 3:
+                    # Extend General_data array if needed
+                    General_data.extend([0])  # Add space for full port path flag
+                General_data[0] = -1  # Use -1 to indicate full path mode
+                # Store full path in shared_string temporarily for serial functions to access
+                shared_string.value = COMPORT_value.encode('utf-8')
+            else:
+                # Try to extract number for backward compatibility
+                pattern = re.compile(r'\D*(\d+)\D*')
+                match = pattern.match(COMPORT_value)
+                if match:
+                    com_number = int(match.group(1))
+                    General_data[0] = com_number
+                else:
+                    # Default to 0 if no match found
+                    General_data[0] = 0
         else:
-             None  # Return None if no match is found
+            # For Windows and Linux, keep existing behavior
+            pattern = re.compile(r'\D*(\d+)\D*')
+            match = pattern.match(COMPORT_value)
+            if match:
+               com_number = int(match.group(1))
+               General_data[0] = com_number
+            else:
+                 General_data[0] = 0  # Default to 0 if no match found
 
-        print(General_data[0])
+        print("Port setting:", General_data[0])
+        if my_os == "Darwin" and General_data[0] == -1:
+            print("Full path mode for macOS:", COMPORT_value)
         
         
 
@@ -1603,5 +1640,3 @@ if __name__ == "__main__":
          Position_in,Speed_in,Homed_in,InOut_in,Temperature_error_in,Position_error_in,Timeout_error,Timing_data_in,
          XTR_data,Gripper_data_in,
         Joint_jog_buttons,Cart_jog_buttons,Jog_control,General_data,Buttons)
-    
-
