@@ -17,6 +17,7 @@ import platform
 import os
 import re
 import math
+import argparse
 from roboticstoolbox import trapezoidal, DHRobot, quintic
 from spatialmath.base.argcheck import (
     isvector,
@@ -100,6 +101,44 @@ def calculate_adaptive_tolerance(robot, q, strict_tol=1e-10, loose_tol=1e-7):
     
     return adaptive_tol
 
+def calculate_configuration_dependent_max_reach(q_seed):
+    """
+    Calculate maximum reach based on joint configuration, particularly joint 5.
+    When joint 5 is at 90 degrees, the effective reach is reduced by approximately 0.045.
+    
+    Parameters
+    ----------
+    q_seed : array_like
+        Current joint configuration in radians
+        
+    Returns
+    -------
+    float
+        Configuration-dependent maximum reach threshold
+    """
+    base_max_reach = 0.44  # Base maximum reach from experimentation
+    
+    j5_angle = q_seed[4] if len(q_seed) > 4 else 0.0
+    j5_normalized = normalize_angle(j5_angle)
+    angle_90_deg = np.pi / 2
+    angle_neg_90_deg = -np.pi / 2
+    dist_from_90 = abs(j5_normalized - angle_90_deg)
+    dist_from_neg_90 = abs(j5_normalized - angle_neg_90_deg)
+    dist_from_90_deg = min(dist_from_90, dist_from_neg_90)
+    reduction_range = np.pi / 4  # 45 degrees
+    if dist_from_90_deg <= reduction_range:
+        # Calculate reduction factor based on proximity to 90°
+        proximity_factor = 1.0 - (dist_from_90_deg / reduction_range)
+        reach_reduction = 0.045 * proximity_factor
+        effective_max_reach = base_max_reach - reach_reduction
+
+        j5_degrees = np.rad2deg(j5_normalized)
+        print(f"Joint 5 at {j5_degrees:.1f}°, reach reduction: {reach_reduction:.3f}, effective max reach: {effective_max_reach:.3f}")
+        
+        return effective_max_reach
+    else:
+        return base_max_reach
+
 def solve_ik_with_adaptive_tol_subdivision(
         robot: DHRobot,
         target_pose: SE3,
@@ -155,16 +194,21 @@ def solve_ik_with_adaptive_tol_subdivision(
         # Check if this is an inward movement (recovery)
         is_recovery = target_reach < current_reach
         
+        # Calculate configuration-dependent maximum reach based on joint 5 position
+        max_reach_threshold = calculate_configuration_dependent_max_reach(q_seed)
+        
         # Determine damping based on reach and movement direction
         if is_recovery:
             # Recovery mode - always use low damping
-            damping = 0.001
+            damping = 0.0000001
         else:
-            # Check if we're near max reach
-            if current_reach > 0.44:  # Near workspace boundary. Value from experimentation
-                damping = 0.1  # High damping for stability
+            # Check if we're near configuration-dependent max reach
+            # print(f"current_reach:{current_reach:.3f}, max_reach_threshold:{max_reach_threshold:.3f}")
+            if current_reach >= max_reach_threshold:
+                print(f"Reach limit exceeded: {current_reach:.3f} >= {max_reach_threshold:.3f}")
+                return [], False, depth, 0
             else:
-                damping = 0.001  # Normal low damping
+                damping = 0.0000001  # Normal low damping
         
         res = robot.ikine_LMS(Tb, q0=q_seed, ilimit=ilimit, tol=tol, wN=damping)
         if res.success:
@@ -569,23 +613,23 @@ def Task1(shared_string,Position_out,Speed_out,Command_out,Affected_joint_out,In
                     # If any joint passed its position limit, disable robot
 
 
-                if Robot_mode != "Cartesian jog":
+                # For cartesian jogging, scale ALL joints proportionally to maintain path accuracy
+                max_scale_factor = 1.0
+                
+                # Find the maximum scaling factor needed across all joints
+                for i in range(6):
+                    if abs(Speed_out[i]) > PAROL6_ROBOT.Joint_max_speed[i]:
+                        scale_factor = abs(Speed_out[i]) / PAROL6_ROBOT.Joint_max_speed[i]
+                        if scale_factor > max_scale_factor:
+                            max_scale_factor = scale_factor
+                
+                # If scaling is needed, apply it to ALL joints to maintain coordination
+                if max_scale_factor > 1.0:
                     for i in range(6):
-                        if abs(Speed_out[i]) >= 300000:
-                            Speed_out[i] = int(Speed_out[i] / 10000)
-                            arr = bytes(str(Speed_out[i]), 'utf-8')
-                            arr2 = bytes(str(i+1),'utf-8')
-                            shared_string.value = b'Error: Joint  ' + arr2  +   b'  speed error in cart mode  '+ arr
-
-
-                else:
-                    # If any joint starts moving faster than allowed DISABLE ROBOT
-                    for i in range(6):
-                        if abs(Speed_out[i]) >= 300000:
-                            Command_out.value = 102
-                            arr = bytes(str(Speed_out[i]), 'utf-8')
-                            arr2 = bytes(str(i+1),'utf-8')
-                            shared_string.value = b'Error: Joint  ' + arr2  +   b'  speed error in cart mode  '+ arr
+                        Speed_out[i] = int(Speed_out[i] / max_scale_factor)
+                    
+                    scale_percent = int((1.0 / max_scale_factor) * 100)
+                    shared_string.value = b'Warning: Cartesian jog speeds scaled to ' + bytes(str(scale_percent), 'utf-8') + b'% to respect joint limits'
                 Robot_mode = "Cartesian jog"
                 # Calculate every joint speed using var and q1
 
@@ -2960,8 +3004,15 @@ def SIMULATOR_process(Position_out,Position_in,Position_Sim,Buttons):
 # u PROCES kao argumenti idu multi proc arrays tu dolje u initi
 # Gore u thredovima i funkcijama to nazovem kako oćem i pozivam stvari iz toga i tjt
 if __name__ == '__main__':
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='PAROL Commander Software')
+    parser.add_argument('--no-simulator', action='store_true', 
+                        help='Run without the 3D simulator window')
+    args = parser.parse_args()
 
     print("running")
+    if args.no_simulator:
+        print("Simulator disabled via command line argument")
     time.sleep(0.01) 
 
     try:
@@ -3040,11 +3091,19 @@ if __name__ == '__main__':
     time.sleep(1)
     process2.start()
     time.sleep(1)
-    process3.start()
+    
+    # Only start simulator if not disabled
+    if not args.no_simulator:
+        process3.start()
+    
+    # Join processes
     process1.join()
     process2.join()
-    process3.join()
+    if not args.no_simulator:
+        process3.join()
 
+    # Terminate processes
     process1.terminate()
     process2.terminate()
-    process3.terminate()
+    if not args.no_simulator:
+        process3.terminate()
