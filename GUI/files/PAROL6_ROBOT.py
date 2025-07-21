@@ -84,7 +84,7 @@ Cartesian_linear_acc_max = 0.06
 Cartesian_angular_velocity_min = 0.7
 Cartesian_angular_velocity_max = 25
 
-Joint_max_speed = [6500,18000,20000,22000,22000,22000] # max speed in STEP/S used
+Joint_max_speed = [6500,18000,20000,20000,22000,22000] # max speed in STEP/S used
 Joint_min_speed = [100,100,100,100,100,100] # min speed in STEP/S used 
 
 Joint_max_acc = 32000 # max acceleration in RAD/S²
