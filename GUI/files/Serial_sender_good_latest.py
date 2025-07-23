@@ -17,7 +17,6 @@ import platform
 import os
 import re
 import math
-import argparse
 from roboticstoolbox import trapezoidal, DHRobot, quintic
 from spatialmath.base.argcheck import (
     isvector,
@@ -3004,15 +3003,8 @@ def SIMULATOR_process(Position_out,Position_in,Position_Sim,Buttons):
 # u PROCES kao argumenti idu multi proc arrays tu dolje u initi
 # Gore u thredovima i funkcijama to nazovem kako oćem i pozivam stvari iz toga i tjt
 if __name__ == '__main__':
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='PAROL Commander Software')
-    parser.add_argument('--no-simulator', action='store_true', 
-                        help='Run without the 3D simulator window')
-    args = parser.parse_args()
-
+    
     print("running")
-    if args.no_simulator:
-        print("Simulator disabled via command line argument")
     time.sleep(0.01) 
 
     try:
@@ -3092,18 +3084,14 @@ if __name__ == '__main__':
     process2.start()
     time.sleep(1)
     
-    # Only start simulator if not disabled
-    if not args.no_simulator:
-        process3.start()
+    process3.start()
     
     # Join processes
     process1.join()
     process2.join()
-    if not args.no_simulator:
-        process3.join()
+    process3.join()
 
     # Terminate processes
     process1.terminate()
     process2.terminate()
-    if not args.no_simulator:
-        process3.terminate()
+    process3.terminate()
