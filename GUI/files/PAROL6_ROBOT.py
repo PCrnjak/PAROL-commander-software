@@ -84,7 +84,7 @@ Cartesian_linear_acc_max = 0.06
 Cartesian_angular_velocity_min = 0.7
 Cartesian_angular_velocity_max = 25
 
-Joint_max_speed = [6500,18000,20000,22000,22000,22000] # max speed in STEP/S used
+Joint_max_speed = [6500,18000,20000,20000,22000,22000] # max speed in STEP/S used
 Joint_min_speed = [100,100,100,100,100,100] # min speed in STEP/S used 
 
 Joint_max_acc = 32000 # max acceleration in RAD/S²
@@ -161,6 +161,104 @@ def RAD_SEC_2_DEG_SEC(rad_per_sec):
 def DEG_SEC_2_RAD_SEC(deg_per_sec):
     return deg_per_sec * deg_per_sec_2_radian_per_sec_const
 
+
+def check_joint_limits(q, target_q=None, allow_recovery=True):
+    """
+    Check if joint angles are within their limits, with support for recovery movements.
+    
+    Parameters
+    ----------
+    q : array_like
+        Current joint angles in radians
+    target_q : array_like, optional
+        Target joint angles in radians. If provided, recovery logic is applied.
+    allow_recovery : bool, optional
+        Whether to allow recovery movements when current position violates limits
+        
+    Returns
+    -------
+    bool
+        True if movement is allowed (within limits or valid recovery), False otherwise
+    dict
+        Dictionary with joint limit violation details and recovery information
+    """
+    q_array = np.array(q)
+    target_array = np.array(target_q) if target_q is not None else None
+    violations = {}
+    all_valid = True
+    
+    for i in range(min(len(q_array), len(Joint_limits_radian))):
+        min_limit = Joint_limits_radian[i][0]
+        max_limit = Joint_limits_radian[i][1]
+        current_pos = q_array[i]
+        
+        # Check if current position violates limits
+        current_violates = current_pos < min_limit or current_pos > max_limit
+        
+        if current_violates:
+            violation_type = 'below_min' if current_pos < min_limit else 'above_max'
+            
+            # If we have a target and recovery is enabled, check if it's a recovery movement
+            if target_array is not None and allow_recovery:
+                target_pos = target_array[i]
+                is_recovery = False
+                
+                if current_pos > max_limit:  # Past upper limit
+                    # Recovery means moving towards or below the upper limit
+                    is_recovery = target_pos <= current_pos
+                    recovery_direction = "move joint towards negative direction"
+                elif current_pos < min_limit:  # Past lower limit
+                    # Recovery means moving towards or above the lower limit  
+                    is_recovery = target_pos >= current_pos
+                    recovery_direction = "move joint towards positive direction"
+                
+                violations[f'joint_{i+1}'] = {
+                    'current_value': current_pos,
+                    'target_value': target_pos if target_array is not None else None,
+                    'min_limit': min_limit,
+                    'max_limit': max_limit,
+                    'violation': violation_type,
+                    'is_recovery': is_recovery,
+                    'recovery_direction': recovery_direction if not is_recovery else None,
+                    'movement_allowed': is_recovery
+                }
+                
+                # Only flag as invalid if it's not a recovery movement
+                if not is_recovery:
+                    all_valid = False
+            else:
+                # No target provided or recovery disabled - flag as violation
+                violations[f'joint_{i+1}'] = {
+                    'current_value': current_pos,
+                    'target_value': None,
+                    'min_limit': min_limit,
+                    'max_limit': max_limit,
+                    'violation': violation_type,
+                    'is_recovery': False,
+                    'recovery_direction': None,
+                    'movement_allowed': False
+                }
+                all_valid = False
+        elif target_array is not None:
+            # Current is within limits, check if target would violate
+            target_pos = target_array[i]
+            target_violates = target_pos < min_limit or target_pos > max_limit
+            
+            if target_violates:
+                target_violation_type = 'below_min' if target_pos < min_limit else 'above_max'
+                violations[f'joint_{i+1}'] = {
+                    'current_value': current_pos,
+                    'target_value': target_pos,
+                    'min_limit': min_limit,
+                    'max_limit': max_limit,
+                    'violation': f'target_{target_violation_type}',
+                    'is_recovery': False,
+                    'recovery_direction': None,
+                    'movement_allowed': False
+                }
+                all_valid = False
+    
+    return all_valid, violations
 
 def extract_from_can_id(can_id):
     # Extracting ID2 (first 4 MSB)
