@@ -37,6 +37,9 @@ PAROL6 is a high-performance 3D-printed desktop robotic arm. The design approach
 To run the PAROL6 robotic arm with commander software you will need to meet some minimal PC specifications.
 Check already tested systems and compare them to your system: [Compare](https://github.com/PCrnjak/PAROL-commander-software/blob/main/confirmed_working_systems.md)
 
+## Python API
+If you are not interested in GUI control and simulator you can use Python API to control the robot - [Python API](https://github.com/PCrnjak/PAROL6-python-API)
+
 # How to install 
 
 Tested on python 3.10.12 <br />
